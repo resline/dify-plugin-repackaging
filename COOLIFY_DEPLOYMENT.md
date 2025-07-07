@@ -33,6 +33,17 @@ MAX_FILE_SIZE=524288000
 
 ## Common Issues
 
+### Nginx Configuration Mount Error
+
+If you see this error:
+```
+error mounting "/data/coolify/applications/.../nginx.conf" to rootfs at "/etc/nginx/nginx.conf"
+```
+
+**Solution**: The nginx service now builds from a Dockerfile instead of mounting the config file. Make sure:
+- The `nginx/` directory exists with `Dockerfile` and `nginx.conf`
+- Docker Compose uses `build: ./nginx` instead of mounting volumes
+
 ### BACKEND_CORS_ORIGINS Error
 
 If you see this error:
