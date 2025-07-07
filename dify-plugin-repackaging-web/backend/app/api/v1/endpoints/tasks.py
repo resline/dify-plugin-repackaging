@@ -98,17 +98,45 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
             
             plugin_info = task_data.marketplace_plugin
         elif task_data.url:
-            # Use direct URL
-            download_url = task_data.url
+            # Check if it's a marketplace URL without version
+            marketplace_info = MarketplaceService.parse_marketplace_url(task_data.url)
             
-            # Validate URL
-            if not download_url.endswith('.difypkg'):
-                raise HTTPException(
-                    status_code=400,
-                    detail="URL must point to a .difypkg file"
-                )
-            
-            plugin_info = None
+            if marketplace_info:
+                # It's a marketplace URL - extract author and name
+                author, name = marketplace_info
+                
+                # Get the latest version
+                latest_version = await MarketplaceService.get_latest_version(author, name)
+                
+                if not latest_version:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Could not find plugin {author}/{name} in marketplace or unable to determine latest version"
+                    )
+                
+                # Build download URL with latest version
+                download_url = MarketplaceService.construct_download_url(author, name, latest_version)
+                
+                # Set plugin info for metadata
+                plugin_info = {
+                    "author": author,
+                    "name": name,
+                    "version": latest_version
+                }
+                
+                logger.info(f"Resolved marketplace URL to: {author}/{name} v{latest_version}")
+            else:
+                # Regular direct URL
+                download_url = task_data.url
+                
+                # Validate URL
+                if not download_url.endswith('.difypkg'):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="URL must point to a .difypkg file or be a valid marketplace plugin URL"
+                    )
+                
+                plugin_info = None
         else:
             raise HTTPException(
                 status_code=400,

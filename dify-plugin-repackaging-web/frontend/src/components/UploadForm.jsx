@@ -20,15 +20,21 @@ const UploadForm = ({ onSubmit, onSubmitMarketplace, isLoading }) => {
   const [suffix, setSuffix] = useState('offline');
   const [errors, setErrors] = useState({});
 
+  const isMarketplaceUrl = (url) => {
+    // Check if URL matches marketplace pattern
+    const marketplacePattern = /^https?:\/\/marketplace\.dify\.ai\/plugins\/[^\/]+\/[^\/]+\/?$/;
+    return marketplacePattern.test(url);
+  };
+
   const validateForm = () => {
     const newErrors = {};
     
     if (!url) {
       newErrors.url = 'URL is required';
-    } else if (!url.endsWith('.difypkg')) {
-      newErrors.url = 'URL must point to a .difypkg file';
     } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
       newErrors.url = 'URL must start with http:// or https://';
+    } else if (!url.endsWith('.difypkg') && !isMarketplaceUrl(url)) {
+      newErrors.url = 'URL must point to a .difypkg file or be a marketplace plugin URL';
     }
     
     if (!suffix) {
@@ -103,7 +109,7 @@ const UploadForm = ({ onSubmit, onSubmitMarketplace, isLoading }) => {
             className={`block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
               errors.url ? 'border-red-300' : 'border-gray-300'
             }`}
-            placeholder="https://marketplace.dify.ai/plugins/example.difypkg"
+            placeholder="https://marketplace.dify.ai/plugins/langgenius/ollama"
             disabled={isLoading}
           />
         </div>
@@ -111,7 +117,9 @@ const UploadForm = ({ onSubmit, onSubmitMarketplace, isLoading }) => {
           <p className="mt-2 text-sm text-red-600">{errors.url}</p>
         )}
         <p className="mt-2 text-sm text-gray-500">
-          Enter the URL of a .difypkg file from Dify Marketplace or GitHub
+          {isMarketplaceUrl(url) 
+            ? 'Marketplace plugin detected - will use the latest version'
+            : 'Enter a .difypkg URL or marketplace plugin URL (e.g., https://marketplace.dify.ai/plugins/author/name)'}
         </p>
       </div>
 

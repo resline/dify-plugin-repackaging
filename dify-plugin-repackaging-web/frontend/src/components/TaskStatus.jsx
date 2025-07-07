@@ -171,7 +171,7 @@ const TaskStatus = ({ taskId, onComplete, onError }) => {
       )}
 
       {/* Plugin metadata if from marketplace */}
-      {task.plugin_metadata && (
+      {(task.plugin_metadata || task.marketplace_metadata || task.plugin_info) && (
         <div className="mt-4 p-3 bg-gray-50 rounded-md">
           <div className="flex items-center gap-2 mb-2">
             <Package className="h-4 w-4 text-gray-500" />
@@ -180,21 +180,21 @@ const TaskStatus = ({ taskId, onComplete, onError }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
             <div className="flex items-center gap-1">
               <span className="text-gray-500">Name:</span>
-              <span className="font-medium">{task.plugin_metadata.name}</span>
+              <span className="font-medium">{(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).name}</span>
             </div>
             <div className="flex items-center gap-1">
               <User className="h-3 w-3 text-gray-400" />
               <span className="text-gray-500">Author:</span>
-              <span className="font-medium">{task.plugin_metadata.author}</span>
+              <span className="font-medium">{(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).author}</span>
             </div>
             <div className="flex items-center gap-1">
               <Tag className="h-3 w-3 text-gray-400" />
               <span className="text-gray-500">Version:</span>
-              <span className="font-medium">v{task.plugin_metadata.version}</span>
+              <span className="font-medium">v{(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).version}</span>
             </div>
           </div>
-          {task.plugin_metadata.description && (
-            <p className="mt-2 text-sm text-gray-600">{task.plugin_metadata.description}</p>
+          {(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).description && (
+            <p className="mt-2 text-sm text-gray-600">{(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).description}</p>
           )}
         </div>
       )}

@@ -1,9 +1,10 @@
 import httpx
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from app.core.config import settings
 from app.workers.celery_app import redis_client
 import logging
 import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -222,3 +223,63 @@ class MarketplaceService:
             logger.error(f"Error getting categories: {e}")
             # Return default categories on error
             return ["agent", "tool", "model", "extension", "workflow"]
+    
+    @staticmethod
+    def parse_marketplace_url(url: str) -> Optional[Tuple[str, str]]:
+        """
+        Parse a marketplace URL to extract author and plugin name
+        
+        Supports URLs like:
+        - https://marketplace.dify.ai/plugins/langgenius/ollama
+        - http://marketplace.dify.ai/plugins/langgenius/ollama/
+        
+        Returns:
+            Tuple of (author, name) if valid marketplace URL, None otherwise
+        """
+        # Remove settings.MARKETPLACE_API_URL to handle both production and custom URLs
+        marketplace_base = settings.MARKETPLACE_API_URL.rstrip('/')
+        # Remove protocol to make matching easier
+        marketplace_host = marketplace_base.replace('https://', '').replace('http://', '')
+        
+        # Pattern to match marketplace plugin URLs
+        pattern = rf'^https?://{re.escape(marketplace_host)}/plugins/([^/]+)/([^/]+)/?$'
+        
+        match = re.match(pattern, url.strip())
+        if match:
+            author = match.group(1)
+            name = match.group(2)
+            logger.info(f"Parsed marketplace URL: author={author}, name={name}")
+            return (author, name)
+        
+        return None
+    
+    @staticmethod
+    async def get_latest_version(author: str, name: str) -> Optional[str]:
+        """
+        Get the latest version of a plugin
+        
+        Args:
+            author: Plugin author
+            name: Plugin name
+            
+        Returns:
+            Latest version string if found, None otherwise
+        """
+        try:
+            # Try to get plugin details which includes latest_version
+            plugin_details = await MarketplaceService.get_plugin_details(author, name)
+            
+            if plugin_details and 'latest_version' in plugin_details:
+                return plugin_details['latest_version']
+            
+            # Fallback to getting versions list
+            versions = await MarketplaceService.get_plugin_versions(author, name)
+            if versions and len(versions) > 0:
+                # Versions are typically returned sorted with latest first
+                return versions[0].get('version')
+                
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting latest version for {author}/{name}: {e}")
+            return None
