@@ -78,6 +78,9 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
     The task will include marketplace metadata in WebSocket updates when using marketplace mode.
     """
     try:
+        # Log request data for debugging
+        logger.info(f"Create task request: url={task_data.url}, marketplace_plugin={task_data.marketplace_plugin}")
+        
         # Generate task ID
         task_id = str(uuid.uuid4())
         
@@ -208,7 +211,7 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
         raise
     except Exception as e:
         logger.exception("Error creating task")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/tasks/marketplace", response_model=TaskResponse)

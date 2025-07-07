@@ -58,10 +58,20 @@ pydantic_settings.sources.SettingsError: error parsing value for field "BACKEND_
 
 ### Services Not Connecting
 
-If backend shows "Host is unreachable":
+If backend shows "Host is unreachable" or returns 502/500 errors:
 1. Ensure all services are in the same Docker network
 2. Check that service names match in docker-compose
 3. Verify Redis is running and accessible
+4. Wait 30-60 seconds after deployment for all services to fully start
+5. Check health endpoint: `https://your-domain.com/health`
+
+### API Returns 500 Error
+
+If the API returns error 500:
+1. Check backend logs in Coolify for detailed error messages
+2. Verify environment variables are set correctly
+3. Ensure Redis connection is working
+4. Check that all required Python packages are installed
 
 ## Docker Compose Configuration
 

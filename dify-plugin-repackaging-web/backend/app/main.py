@@ -2,9 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from app.core.config import settings
-from app.api import endpoints
 from app.api import websocket
-from app.api import marketplace
 from app.api.v1.endpoints import marketplace as v1_marketplace
 from app.api.v1.endpoints import tasks as v1_tasks
 import logging
@@ -33,12 +31,9 @@ app.add_middleware(
 )
 
 # Include routers
-# Legacy endpoints (kept for compatibility)
-app.include_router(endpoints.router, prefix=settings.API_V1_STR)
-app.include_router(marketplace.router, prefix=settings.API_V1_STR)
 app.include_router(websocket.router)
 
-# V1 endpoints (new structure)
+# V1 endpoints
 app.include_router(v1_marketplace.router, prefix=settings.API_V1_STR)
 app.include_router(v1_tasks.router, prefix=settings.API_V1_STR)
 
@@ -56,8 +51,23 @@ def read_root():
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "healthy"}
+async def health_check():
+    """Health check endpoint"""
+    try:
+        # Check Redis connection
+        from app.workers.celery_app import redis_client
+        redis_client.ping()
+        
+        return {
+            "status": "healthy",
+            "redis": "connected",
+            "version": settings.APP_VERSION
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "error": str(e)
+        }
 
 
 if __name__ == "__main__":
