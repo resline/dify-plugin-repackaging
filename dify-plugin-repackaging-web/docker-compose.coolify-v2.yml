@@ -3,7 +3,6 @@ version: '3.8'
 services:
   backend:
     build: ./backend
-    container_name: backend-${COMPOSE_PROJECT_NAME:-app}
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
@@ -20,7 +19,9 @@ services:
     depends_on:
       - redis
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - backend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -29,7 +30,6 @@ services:
 
   worker:
     build: ./backend
-    container_name: worker-${COMPOSE_PROJECT_NAME:-app}
     restart: unless-stopped
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
     environment:
@@ -49,7 +49,6 @@ services:
 
   celery-beat:
     build: ./backend
-    container_name: celery-beat-${COMPOSE_PROJECT_NAME:-app}
     restart: unless-stopped
     command: celery -A app.workers.celery_app beat --loglevel=info
     environment:
@@ -64,22 +63,24 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: frontend-${COMPOSE_PROJECT_NAME:-app}
     restart: unless-stopped
     depends_on:
       - backend
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - frontend
 
   redis:
     image: redis:7-alpine
-    container_name: redis-${COMPOSE_PROJECT_NAME:-app}
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis-data:/data
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -90,10 +91,8 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile.coolify
-    container_name: nginx-${COMPOSE_PROJECT_NAME:-app}
     restart: unless-stopped
     # IMPORTANT: No ports mapping! Coolify's Traefik will handle external access
-    # Only expose the port internally for container-to-container communication
     expose:
       - "80"
     environment:
@@ -112,9 +111,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    labels:
-      # Coolify/Traefik will use these labels for routing
-      - "coolify.managed=true"
 
 volumes:
   redis-data:
@@ -122,5 +118,4 @@ volumes:
 
 networks:
   app-network:
-    name: ${COOLIFY_NETWORK:-app-network}
-    external: ${COOLIFY_NETWORK_EXTERNAL:-false}
+    driver: bridge

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Single container with all services
+  app:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://localhost:6379/0
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+      - BACKEND_CORS_ORIGINS=["https://dify-plugin.resline.net"]
+      - TEMP_DIR=/app/temp
+      - SCRIPTS_DIR=/app/scripts
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-10}
+      - FILE_RETENTION_HOURS=${FILE_RETENTION_HOURS:-24}
+    volumes:
+      - temp-data:/app/temp
+      - ./backend/scripts:/app/scripts:ro
+      - ./frontend/dist:/app/static:ro
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: |
+      sh -c "
+        # Start Redis in background
+        redis-server --daemonize yes &&
+        # Start Celery worker in background
+        celery -A app.workers.celery_app worker --loglevel=info --detach &&
+        # Start Celery beat in background
+        celery -A app.workers.celery_app beat --loglevel=info --detach &&
+        # Start FastAPI app
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+
+volumes:
+  temp-data:

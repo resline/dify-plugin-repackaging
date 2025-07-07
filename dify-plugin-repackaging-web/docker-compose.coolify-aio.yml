@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.all-in-one
+    restart: unless-stopped
+    environment:
+      - BACKEND_CORS_ORIGINS=["https://dify-plugin.resline.net"]
+      - TEMP_DIR=/app/temp
+      - SCRIPTS_DIR=/app/scripts
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-10}
+      - FILE_RETENTION_HOURS=${FILE_RETENTION_HOURS:-24}
+    volumes:
+      - temp-data:/app/temp
+      - ./backend/scripts:/app/scripts:ro
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  temp-data:
