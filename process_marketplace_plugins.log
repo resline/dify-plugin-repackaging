@@ -1,0 +1,205 @@
+Processing started at pon, 7 lip 2025, 00:41:26 CEST
+Found 1 plugin(s) to process
+Platform: manylinux2014_x86_64, Suffix: offline
+
+Processing: langgenius-openai_api_compatible_0.0.16.difypkg
+local
+/mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/plugin_from_marketplace/langgenius-openai_api_compatible_0.0.16.difypkg
+Unziping ...
+Archive:  /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/plugin_from_marketplace/langgenius-openai_api_compatible_0.0.16.difypkg
+{"signature":"WgJ1zUpzM4lwk0WFI0xQC5c/RcPZtaBrMWpgA0TPlwEe2fhSFk5A/4V/EbxVqBo436qFOnOxdIzY4wSOP027pZ8a5g+XajifTw7dyeX41Q2fM/TUDdom2gSljWu2Ttsobnn0f/130j76UBIVJNuUaja3Nv7uWF4zUwNRrdRDYIZT/YwB3c0HTMqZKCz9dW5c2muqMwPvExAyUXcllgsNiBcsiJA334IghvHGfrgEl+c+LQnVxrt7RoLmBkhWfsLT8v2ZcLk8kBER0zwF50oym/o9jRYwl4kMI2h+1gYZ3AKIFevqRK4RdiLzzpujj4pCTZpnmU61eIN635xp4ucQw3AJSNsPK5wa4D2y4RvPiDkovHYnwK/IeVxZUKlUV4CrI04vMzytUClePI5DRX5n25FPr8PjiEk16n3ZwG5stNZU6EkRTxMLLXWMC2nEFJWW5G9gDxbzSxXCea/FPYsz13pcFTDUHYstAvo5j5v57K8d1zKOaCBXBm+dESaIYTgQkarYxV3fz7iDKLrMMGY0LKqE/aAZC+w3BFzTuE5hbOL+FEZH8WC6B3Kj4w3K+Sw3al8vH6kFBGec7YrnQpXKlniwhzwD8tvB4ouIMxLmA78/RLtUdJ1jRx3sOzADDGmsyPCktoXq0XxQO/zmu6zzxEbmpOzNvtObGVtdBkmcgFc=","time":1748529943}
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/README.md  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/_assets/audio.mp3  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/_assets/icon.svg  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/_assets/openai_api_compatible-01.png  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/main.py  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/manifest.yaml  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/models/common_openai.py  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/models/llm/llm.py  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/models/rerank/rerank.py  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/models/speech2text/speech2text.py  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/models/text_embedding/text_embedding.py  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/models/tts/tts.py  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/provider/openai_api_compatible.py  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/provider/openai_api_compatible.yaml  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/requirements.txt  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/.verification.dify.json  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/.verification.dify.json  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/.verification.dify.json  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/.verification.dify.json  
+  inflating: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16/.verification.dify.json  
+Unzip success.
+Repackaging ...
+Looking in indexes: https://mirrors.aliyun.com/pypi/simple
+Collecting dify_plugin<0.3.0,>=0.2.0 (from -r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/a5/c3/39ade4023f48f107dd4e0cc3b5cdf7dc5b55e336731d065d089ddd1f7015/dify_plugin-0.2.4-py3-none-any.whl (317 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 317.0/317.0 kB 1.3 MB/s eta 0:00:00
+Collecting openai~=1.66.3 (from -r requirements.txt (line 2))
+  Downloading https://mirrors.aliyun.com/pypi/packages/c7/3b/1ba418920ecd1eae7cc4d4ac8a01711ee0879b1a57dd81d10551e5b9a2ea/openai-1.66.5-py3-none-any.whl (571 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 571.1/571.1 kB 4.8 MB/s eta 0:00:00
+Collecting Flask~=3.0.3 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/61/80/ffe1da13ad9300f87c93af113edd0638c75138c42a0994becfacac078c06/flask-3.0.3-py3-none-any.whl (101 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 101.7/101.7 kB 4.6 MB/s eta 0:00:00
+Collecting Werkzeug~=3.0.3 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/6c/69/05837f91dfe42109203ffa3e488214ff86a6d68b2ed6c167da6cdc42349b/werkzeug-3.0.6-py3-none-any.whl (227 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 228.0/228.0 kB 5.7 MB/s eta 0:00:00
+Collecting dpkt~=1.9.8 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/11/79/479e2194c9096b92aecdf33634ae948d2be306c6011673e98ee1917f32c2/dpkt-1.9.8-py3-none-any.whl (194 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 195.0/195.0 kB 1.6 MB/s eta 0:00:00
+Collecting gevent~=24.11.1 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/ec/c9/f006c0cd59f0720fbb62ee11da0ad4c4c0fd12799afd957dd491137e80d9/gevent-24.11.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (6.8 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.8/6.8 MB 1.8 MB/s eta 0:00:00
+Collecting httpx~=0.28.1 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl (73 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 kB 3.7 MB/s eta 0:00:00
+Collecting pydantic_settings<3.0.0,>=2.5.0 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/58/f0/427018098906416f580e3cf1366d3b1abfb408a0652e9f31600c24a1903c/pydantic_settings-2.10.1-py3-none-any.whl (45 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.2/45.2 kB 2.6 MB/s eta 0:00:00
+Collecting pydantic>=2.8.2 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/6a/c0/ec2b1c8712ca690e5d61979dee872603e92b8a32f94cc1b72d53beab008a/pydantic-2.11.7-py3-none-any.whl (444 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 444.8/444.8 kB 1.2 MB/s eta 0:00:00
+Collecting pydub~=0.25.1 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/a6/53/d78dc063216e62fc55f6b2eebb447f6a4b0a59f55c8406376f76bf959b08/pydub-0.25.1-py2.py3-none-any.whl (32 kB)
+Collecting pyyaml~=6.0.1 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/b9/2b/614b4752f2e127db5cc206abc23a8c19678e92b23c3db30fc86ab731d3bd/PyYAML-6.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (767 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 767.5/767.5 kB 348.6 kB/s eta 0:00:00
+Collecting requests~=2.32.3 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/7c/e4/56027c4a6b4ae70ca9de302488c5ca95ad4a39e190093d6c1a8ace08341b/requests-2.32.4-py3-none-any.whl (64 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 64.8/64.8 kB 3.5 MB/s eta 0:00:00
+Collecting socksio==1.0.0 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/37/c3/6eeb6034408dac0fa653d126c9204ade96b819c936e136c5e8a6897eee9c/socksio-1.0.0-py3-none-any.whl (12 kB)
+Collecting tiktoken~=0.8.0 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/26/32/e0e3a859136e95c85a572e4806dc58bf1ddf651108ae8b97d5f3ebe1a244/tiktoken-0.8.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (1.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 1.6 MB/s eta 0:00:00
+Collecting yarl<2.0,>=1.9.4 (from dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/98/28/3ab7acc5b51f4434b181b0cee8f1f4b77a65919700a355fb3617f9488874/yarl-1.20.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (355 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 355.6/355.6 kB 6.2 MB/s eta 0:00:00
+Collecting anyio<5,>=3.5.0 (from openai~=1.66.3->-r requirements.txt (line 2))
+  Downloading https://mirrors.aliyun.com/pypi/packages/a1/ee/48ca1a7c89ffec8b6a0c5d02b89c305671d5ffd8d3c94acf8b8c408575bb/anyio-4.9.0-py3-none-any.whl (100 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.9/100.9 kB 3.9 MB/s eta 0:00:00
+Collecting distro<2,>=1.7.0 (from openai~=1.66.3->-r requirements.txt (line 2))
+  Downloading https://mirrors.aliyun.com/pypi/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl (20 kB)
+Collecting jiter<1,>=0.4.0 (from openai~=1.66.3->-r requirements.txt (line 2))
+  Downloading https://mirrors.aliyun.com/pypi/packages/e2/ba/77013b0b8ba904bf3762f11e0129b8928bff7f978a81838dfcc958ad5728/jiter-0.10.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (352 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 352.0/352.0 kB 5.9 MB/s eta 0:00:00
+Collecting sniffio (from openai~=1.66.3->-r requirements.txt (line 2))
+  Downloading https://mirrors.aliyun.com/pypi/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl (10 kB)
+Collecting tqdm>4 (from openai~=1.66.3->-r requirements.txt (line 2))
+  Downloading https://mirrors.aliyun.com/pypi/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl (78 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.5/78.5 kB 3.0 MB/s eta 0:00:00
+Collecting typing-extensions<5,>=4.11 (from openai~=1.66.3->-r requirements.txt (line 2))
+  Downloading https://mirrors.aliyun.com/pypi/packages/b5/00/d631e67a838026495268c2f6884f3711a15a9a2a96cd244fdaea53b823fb/typing_extensions-4.14.1-py3-none-any.whl (43 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 43.9/43.9 kB 2.2 MB/s eta 0:00:00
+Collecting idna>=2.8 (from anyio<5,>=3.5.0->openai~=1.66.3->-r requirements.txt (line 2))
+  Downloading https://mirrors.aliyun.com/pypi/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl (70 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 70.4/70.4 kB 5.7 MB/s eta 0:00:00
+Collecting Jinja2>=3.1.2 (from Flask~=3.0.3->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl (134 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.9/134.9 kB 3.9 MB/s eta 0:00:00
+Collecting itsdangerous>=2.1.2 (from Flask~=3.0.3->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+Collecting click>=8.1.3 (from Flask~=3.0.3->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/85/32/10bb5764d90a8eee674e9dc6f4db6a0ab47c8c4d0d83c27f7c39ac415a4d/click-8.2.1-py3-none-any.whl (102 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 102.2/102.2 kB 3.8 MB/s eta 0:00:00
+Collecting blinker>=1.6.2 (from Flask~=3.0.3->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl (8.5 kB)
+Collecting zope.event (from gevent~=24.11.1->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/00/ed/d8c3f56c1edb0ee9b51461dd08580382e9589850f769b69f0dedccff5215/zope_event-5.1-py3-none-any.whl (6.9 kB)
+Collecting zope.interface (from gevent~=24.11.1->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/96/08/2103587ebc989b455cf05e858e7fbdfeedfc3373358320e9c513428290b1/zope.interface-7.2-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (264 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 264.7/264.7 kB 2.7 MB/s eta 0:00:00
+Collecting greenlet>=3.1.1 (from gevent~=24.11.1->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/cc/0d/93729068259b550d6a0288da4ff72b86ed05626eaf1eb7c0d3466a2571de/greenlet-3.2.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (649 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 649.7/649.7 kB 471.2 kB/s eta 0:00:00
+Collecting certifi (from httpx~=0.28.1->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/84/ae/320161bd181fc06471eed047ecce67b693fd7515b16d495d8932db763426/certifi-2025.6.15-py3-none-any.whl (157 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 157.7/157.7 kB 3.6 MB/s eta 0:00:00
+Collecting httpcore==1.* (from httpx~=0.28.1->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl (78 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 kB 3.7 MB/s eta 0:00:00
+Collecting h11>=0.16 (from httpcore==1.*->httpx~=0.28.1->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl (37 kB)
+Collecting annotated-types>=0.6.0 (from pydantic>=2.8.2->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl (13 kB)
+Collecting pydantic-core==2.33.2 (from pydantic>=2.8.2->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/f9/41/4b043778cf9c4285d59742281a769eac371b9e47e35f98ad321349cc5d61/pydantic_core-2.33.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 2.4 MB/s eta 0:00:00
+Collecting typing-inspection>=0.4.0 (from pydantic>=2.8.2->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/17/69/cd203477f944c353c31bade965f880aa1061fd6bf05ded0726ca845b6ff7/typing_inspection-0.4.1-py3-none-any.whl (14 kB)
+Collecting python-dotenv>=0.21.0 (from pydantic_settings<3.0.0,>=2.5.0->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/5f/ed/539768cf28c661b5b068d66d96a2f155c4971a5d55684a514c1a0e0dec2f/python_dotenv-1.1.1-py3-none-any.whl (20 kB)
+Collecting charset_normalizer<4,>=2 (from requests~=2.32.3->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/8c/73/6ede2ec59bce19b3edf4209d70004253ec5f4e319f9a2e3f2f15601ed5f7/charset_normalizer-3.4.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (148 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 148.6/148.6 kB 4.5 MB/s eta 0:00:00
+Collecting urllib3<3,>=1.21.1 (from requests~=2.32.3->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/a7/c2/fe1e52489ae3122415c51f387e221dd0773709bad6c6cdaa599e8a2c5185/urllib3-2.5.0-py3-none-any.whl (129 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 129.8/129.8 kB 4.0 MB/s eta 0:00:00
+Collecting regex>=2022.1.18 (from tiktoken~=0.8.0->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/fb/13/e3b075031a738c9598c51cfbc4c7879e26729c53aa9cca59211c44235314/regex-2024.11.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (796 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 796.9/796.9 kB 348.3 kB/s eta 0:00:00
+Collecting MarkupSafe>=2.1.1 (from Werkzeug~=3.0.3->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/f3/f0/89e7aadfb3749d0f52234a0c8c7867877876e0a20b60e2188e9850794c17/MarkupSafe-3.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (23 kB)
+Collecting multidict>=4.0 (from yarl<2.0,>=1.9.4->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/a4/11/6ec9dcbe2264b92778eeb85407d1df18812248bf3506a5a1754bc035db0c/multidict-6.6.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (256 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 256.1/256.1 kB 4.4 MB/s eta 0:00:00
+Collecting propcache>=0.2.1 (from yarl<2.0,>=1.9.4->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/37/7c/54fd5301ef38505ab235d98827207176a5c9b2aa61939b10a460ca53e123/propcache-0.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (224 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 224.4/224.4 kB 4.2 MB/s eta 0:00:00
+Collecting setuptools (from zope.event->gevent~=24.11.1->dify_plugin<0.3.0,>=0.2.0->-r requirements.txt (line 1))
+  Downloading https://mirrors.aliyun.com/pypi/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl (1.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 4.1 MB/s eta 0:00:00
+Saved ./wheels/dify_plugin-0.2.4-py3-none-any.whl
+Saved ./wheels/socksio-1.0.0-py3-none-any.whl
+Saved ./wheels/openai-1.66.5-py3-none-any.whl
+Saved ./wheels/anyio-4.9.0-py3-none-any.whl
+Saved ./wheels/distro-1.9.0-py3-none-any.whl
+Saved ./wheels/dpkt-1.9.8-py3-none-any.whl
+Saved ./wheels/flask-3.0.3-py3-none-any.whl
+Saved ./wheels/gevent-24.11.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/httpx-0.28.1-py3-none-any.whl
+Saved ./wheels/httpcore-1.0.9-py3-none-any.whl
+Saved ./wheels/jiter-0.10.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/pydantic-2.11.7-py3-none-any.whl
+Saved ./wheels/pydantic_core-2.33.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/pydantic_settings-2.10.1-py3-none-any.whl
+Saved ./wheels/pydub-0.25.1-py2.py3-none-any.whl
+Saved ./wheels/PyYAML-6.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/requests-2.32.4-py3-none-any.whl
+Saved ./wheels/sniffio-1.3.1-py3-none-any.whl
+Saved ./wheels/tiktoken-0.8.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/tqdm-4.67.1-py3-none-any.whl
+Saved ./wheels/typing_extensions-4.14.1-py3-none-any.whl
+Saved ./wheels/werkzeug-3.0.6-py3-none-any.whl
+Saved ./wheels/yarl-1.20.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/annotated_types-0.7.0-py3-none-any.whl
+Saved ./wheels/blinker-1.9.0-py3-none-any.whl
+Saved ./wheels/certifi-2025.6.15-py3-none-any.whl
+Saved ./wheels/charset_normalizer-3.4.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/click-8.2.1-py3-none-any.whl
+Saved ./wheels/greenlet-3.2.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+Saved ./wheels/idna-3.10-py3-none-any.whl
+Saved ./wheels/itsdangerous-2.2.0-py3-none-any.whl
+Saved ./wheels/jinja2-3.1.6-py3-none-any.whl
+Saved ./wheels/MarkupSafe-3.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/multidict-6.6.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Saved ./wheels/propcache-0.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/python_dotenv-1.1.1-py3-none-any.whl
+Saved ./wheels/regex-2024.11.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/typing_inspection-0.4.1-py3-none-any.whl
+Saved ./wheels/urllib3-2.5.0-py3-none-any.whl
+Saved ./wheels/zope_event-5.1-py3-none-any.whl
+Saved ./wheels/zope.interface-7.2-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./wheels/h11-0.16.0-py3-none-any.whl
+Saved ./wheels/setuptools-80.9.0-py3-none-any.whl
+Successfully downloaded dify_plugin socksio openai anyio distro dpkt Flask gevent httpx httpcore jiter pydantic pydantic-core pydantic_settings pydub pyyaml requests sniffio tiktoken tqdm typing-extensions Werkzeug yarl annotated-types blinker certifi charset_normalizer click greenlet idna itsdangerous Jinja2 MarkupSafe multidict propcache python-dotenv regex typing-inspection urllib3 zope.event zope.interface h11 setuptools
+2025/07/07 00:42:26 package.go:39: [32m[INFO]plugin packaged successfully, output path: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16-offline.difypkg[0m
+Repackage success.
+✓ Successfully processed: langgenius-openai_api_compatible_0.0.16.difypkg
+  Moved to: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/repackaged_plugins/langgenius-openai_api_compatible_0.0.16-offline.difypkg
+  Cleaned up temporary directory: /mnt/b9845245-4c1b-4878-be9b-ce0f89f12c1e/Home/work/app/dify-plugin-repackaging/langgenius-openai_api_compatible_0.0.16
+
+=== Processing Complete ===
+Total files: 1
+Successfully processed: 0
+Failed: 0
+Processing ended at pon, 7 lip 2025, 00:42:26 CEST
