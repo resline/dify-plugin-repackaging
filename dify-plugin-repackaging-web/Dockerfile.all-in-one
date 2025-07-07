@@ -3,8 +3,8 @@
 # Stage 1: Build frontend
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
+COPY frontend/package.json ./
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -26,9 +26,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
-
-# Copy nginx config
-COPY nginx/nginx.conf /etc/nginx/nginx.conf
 
 # Create supervisor config
 RUN echo "[supervisord]\n\
@@ -65,9 +62,50 @@ command=nginx -g 'daemon off;'\n\
 autostart=true\n\
 autorestart=true" > /etc/supervisor/conf.d/supervisord.conf
 
-# Fix nginx to use localhost
-RUN sed -i 's/server backend:8000/server localhost:8000/g' /etc/nginx/nginx.conf && \
-    sed -i 's/server frontend:80/server localhost:80/g' /etc/nginx/nginx.conf
+# Create nginx config for all-in-one setup
+RUN echo 'events { worker_connections 1024; }\n\
+http {\n\
+    include /etc/nginx/mime.types;\n\
+    default_type application/octet-stream;\n\
+    \n\
+    server {\n\
+        listen 80;\n\
+        server_name localhost;\n\
+        \n\
+        client_max_body_size 500M;\n\
+        \n\
+        location / {\n\
+            root /usr/share/nginx/html;\n\
+            try_files $uri /index.html;\n\
+        }\n\
+        \n\
+        location /api {\n\
+            proxy_pass http://localhost:8000;\n\
+            proxy_http_version 1.1;\n\
+            proxy_set_header Host $host;\n\
+            proxy_set_header X-Real-IP $remote_addr;\n\
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+            proxy_set_header X-Forwarded-Proto $scheme;\n\
+        }\n\
+        \n\
+        location /ws {\n\
+            proxy_pass http://localhost:8000;\n\
+            proxy_http_version 1.1;\n\
+            proxy_set_header Upgrade $http_upgrade;\n\
+            proxy_set_header Connection "upgrade";\n\
+            proxy_set_header Host $host;\n\
+            proxy_set_header X-Real-IP $remote_addr;\n\
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+            proxy_set_header X-Forwarded-Proto $scheme;\n\
+        }\n\
+        \n\
+        location /health {\n\
+            proxy_pass http://localhost:8000/health;\n\
+            proxy_http_version 1.1;\n\
+            proxy_set_header Host $host;\n\
+        }\n\
+    }\n\
+}' > /etc/nginx/nginx.conf
 
 EXPOSE 80
 
