@@ -4,6 +4,9 @@ from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.api import endpoints
 from app.api import websocket
+from app.api import marketplace
+from app.api.v1.endpoints import marketplace as v1_marketplace
+from app.api.v1.endpoints import tasks as v1_tasks
 import logging
 import os
 
@@ -30,8 +33,14 @@ app.add_middleware(
 )
 
 # Include routers
+# Legacy endpoints (kept for compatibility)
 app.include_router(endpoints.router, prefix=settings.API_V1_STR)
+app.include_router(marketplace.router, prefix=settings.API_V1_STR)
 app.include_router(websocket.router)
+
+# V1 endpoints (new structure)
+app.include_router(v1_marketplace.router, prefix=settings.API_V1_STR)
+app.include_router(v1_tasks.router, prefix=settings.API_V1_STR)
 
 # Create necessary directories
 os.makedirs(settings.TEMP_DIR, exist_ok=True)

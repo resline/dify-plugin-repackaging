@@ -4,6 +4,7 @@ import redis.asyncio as redis
 import json
 import asyncio
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,39 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+
+async def broadcast_marketplace_selection(plugin_metadata: dict):
+    """
+    Broadcast marketplace plugin selection event to all connected clients
+    
+    This can be used to notify other parts of the application when a user
+    selects a plugin from the marketplace browser.
+    """
+    message = {
+        "type": "marketplace_selection",
+        "plugin": plugin_metadata,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    # Broadcast to all connected clients across all tasks
+    all_connections = []
+    for connections in manager.active_connections.values():
+        all_connections.extend(connections)
+    
+    disconnected = []
+    for connection in all_connections:
+        try:
+            await connection.send_json(message)
+        except:
+            disconnected.append(connection)
+    
+    # Clean up disconnected clients
+    for conn in disconnected:
+        for task_id, connections in manager.active_connections.items():
+            if conn in connections:
+                manager.disconnect(conn, task_id)
+                break
 
 
 @router.websocket("/ws/tasks/{task_id}")

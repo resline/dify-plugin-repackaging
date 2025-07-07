@@ -19,6 +19,17 @@ export const taskService = {
     return response.data;
   },
 
+  createMarketplaceTask: async (author, name, version, platform = '', suffix = 'offline') => {
+    const response = await api.post('/tasks/marketplace', {
+      author,
+      name,
+      version,
+      platform,
+      suffix,
+    });
+    return response.data;
+  },
+
   getTaskStatus: async (taskId) => {
     const response = await api.get(`/tasks/${taskId}`);
     return response.data;
@@ -33,6 +44,9 @@ export const taskService = {
     return response.data;
   },
 };
+
+// Re-export marketplaceService from marketplace.js for backward compatibility
+export { marketplaceService } from './marketplace';
 
 export const createWebSocket = (taskId) => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

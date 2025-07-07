@@ -31,6 +31,30 @@ function App() {
     }
   };
 
+  const handleMarketplaceSubmit = async (pluginData) => {
+    setIsLoading(true);
+    
+    try {
+      const task = await taskService.createMarketplaceTask(
+        pluginData.author,
+        pluginData.name,
+        pluginData.version,
+        pluginData.platform,
+        pluginData.suffix
+      );
+      
+      setCurrentTask(task);
+      toast.success('Marketplace task created successfully!');
+    } catch (error) {
+      console.error('Error creating marketplace task:', error);
+      toast.error(
+        error.response?.data?.detail || 'Failed to create task. Please try again.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleTaskComplete = (task) => {
     toast.success('Plugin repackaged successfully! You can now download it.');
   };
@@ -83,7 +107,11 @@ function App() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">
                   Repackage a Dify Plugin
                 </h2>
-                <UploadForm onSubmit={handleSubmit} isLoading={isLoading} />
+                <UploadForm 
+                  onSubmit={handleSubmit} 
+                  onSubmitMarketplace={handleMarketplaceSubmit}
+                  isLoading={isLoading} 
+                />
                 
                 <div className="mt-8 pt-8 border-t border-gray-200">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">

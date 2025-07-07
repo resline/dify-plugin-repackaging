@@ -36,7 +36,8 @@ redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
 def update_task_status(task_id: str, status: TaskStatus, progress: int = 0, 
-                      message: str = "", error: str = None, output_filename: str = None):
+                      message: str = "", error: str = None, output_filename: str = None,
+                      marketplace_metadata: dict = None):
     """Update task status in Redis"""
     task_data = {
         "task_id": task_id,
@@ -47,6 +48,10 @@ def update_task_status(task_id: str, status: TaskStatus, progress: int = 0,
         "error": error,
         "output_filename": output_filename
     }
+    
+    # Include marketplace metadata if provided
+    if marketplace_metadata:
+        task_data["marketplace_metadata"] = marketplace_metadata
     
     if status == TaskStatus.COMPLETED:
         task_data["completed_at"] = datetime.utcnow().isoformat()
@@ -121,6 +126,96 @@ def process_repackaging(self, task_id: str, url: str, platform: str, suffix: str
             0,
             "Processing failed",
             error=str(e)
+        )
+        raise
+    
+    finally:
+        loop.close()
+
+
+@celery_app.task(bind=True)
+def process_marketplace_repackaging(self, task_id: str, author: str, name: str, 
+                                  version: str, platform: str, suffix: str,
+                                  marketplace_metadata: dict = None):
+    """Celery task for processing marketplace plugin repackaging"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        # Update status to downloading with marketplace metadata
+        update_task_status(
+            task_id, 
+            TaskStatus.DOWNLOADING, 
+            5, 
+            f"Downloading {author}/{name} v{version} from marketplace...",
+            marketplace_metadata=marketplace_metadata
+        )
+        
+        # Build download URL
+        from app.services.marketplace import MarketplaceService
+        url = MarketplaceService.build_download_url(author, name, version)
+        
+        # Download file
+        file_path, filename = loop.run_until_complete(
+            DownloadService.download_file(url, task_id)
+        )
+        
+        update_task_status(
+            task_id, 
+            TaskStatus.PROCESSING, 
+            15, 
+            f"Downloaded {filename}",
+            marketplace_metadata=marketplace_metadata
+        )
+        
+        # Process repackaging
+        async def run_repackaging():
+            output_filename = None
+            async for message, progress in RepackageService.repackage_plugin(
+                file_path, platform, suffix, task_id
+            ):
+                update_task_status(
+                    task_id, 
+                    TaskStatus.PROCESSING, 
+                    progress, 
+                    message,
+                    marketplace_metadata=marketplace_metadata
+                )
+                
+                # Extract output filename from message
+                if "Output file:" in message:
+                    output_filename = message.split("Output file:")[-1].strip()
+            
+            return output_filename
+        
+        output_filename = loop.run_until_complete(run_repackaging())
+        
+        # Mark as completed
+        update_task_status(
+            task_id, 
+            TaskStatus.COMPLETED, 
+            100, 
+            "Repackaging completed successfully",
+            output_filename=output_filename,
+            marketplace_metadata=marketplace_metadata
+        )
+        
+        return {
+            "task_id": task_id,
+            "status": "completed",
+            "output_filename": output_filename,
+            "marketplace_metadata": marketplace_metadata
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error processing marketplace task {task_id}")
+        update_task_status(
+            task_id,
+            TaskStatus.FAILED,
+            0,
+            "Processing failed",
+            error=str(e),
+            marketplace_metadata=marketplace_metadata
         )
         raise
     

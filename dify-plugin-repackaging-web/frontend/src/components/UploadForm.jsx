@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Upload, Link } from 'lucide-react';
+import { Upload, Link, Store } from 'lucide-react';
 import { Listbox } from '@headlessui/react';
+import MarketplaceBrowser from './MarketplaceBrowser';
 
 const platforms = [
   { value: '', label: 'Auto-detect (Default)' },
@@ -12,7 +13,8 @@ const platforms = [
   { value: 'macosx_11_0_arm64', label: 'macOS ARM64' },
 ];
 
-const UploadForm = ({ onSubmit, isLoading }) => {
+const UploadForm = ({ onSubmit, onSubmitMarketplace, isLoading }) => {
+  const [mode, setMode] = useState('url'); // 'url' or 'marketplace'
   const [url, setUrl] = useState('');
   const [platform, setPlatform] = useState(platforms[0]);
   const [suffix, setSuffix] = useState('offline');
@@ -49,8 +51,42 @@ const UploadForm = ({ onSubmit, isLoading }) => {
     }
   };
 
+  const handleMarketplaceSelect = (pluginData) => {
+    onSubmitMarketplace(pluginData);
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-6">
+      {/* Mode selector */}
+      <div className="flex rounded-lg shadow-sm" role="group">
+        <button
+          type="button"
+          onClick={() => setMode('url')}
+          className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-lg border ${
+            mode === 'url'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          <Link className="inline-block w-4 h-4 mr-2" />
+          Direct URL
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('marketplace')}
+          className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-lg border ${
+            mode === 'marketplace'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          <Store className="inline-block w-4 h-4 mr-2" />
+          Browse Marketplace
+        </button>
+      </div>
+
+      {mode === 'url' ? (
+        <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <label htmlFor="url" className="block text-sm font-medium text-gray-700">
           Plugin URL
@@ -177,7 +213,15 @@ const UploadForm = ({ onSubmit, isLoading }) => {
           </>
         )}
       </button>
-    </form>
+        </form>
+      ) : (
+        <MarketplaceBrowser
+          onSelectPlugin={handleMarketplaceSelect}
+          platform={platform.value}
+          suffix={suffix}
+        />
+      )}
+    </div>
   );
 };
 

@@ -31,6 +31,10 @@ class Settings(BaseSettings):
         "dify.ai"
     ]
     
+    # Marketplace
+    MARKETPLACE_API_URL: str = "https://marketplace.dify.ai"
+    MARKETPLACE_CACHE_TTL: int = 3600  # 1 hour in seconds
+    
     # Celery
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"

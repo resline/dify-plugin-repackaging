@@ -1,9 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 from app.models.task import TaskCreate, TaskResponse, TaskStatus, MarketplaceTaskCreate
-from app.workers.celery_app import process_repackaging, redis_client
+from app.workers.celery_app import process_repackaging, process_marketplace_repackaging, redis_client
 from app.core.config import settings
 from app.services.marketplace import MarketplaceService
+from pydantic import BaseModel, Field
+from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -18,23 +20,99 @@ logger = logging.getLogger(__name__)
 # Create rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Create router
+# Create router without prefix - it will be added when included in main app
 router = APIRouter(tags=["tasks"])
+
+
+class TaskCreateWithMarketplace(BaseModel):
+    """Task creation with optional marketplace plugin fields"""
+    url: Optional[str] = Field(None, description="Direct URL to the .difypkg file")
+    marketplace_plugin: Optional[dict] = Field(
+        None, 
+        description="Marketplace plugin info with author, name, and version",
+        example={"author": "langgenius", "name": "agent", "version": "0.0.9"}
+    )
+    platform: str = Field("", description="Target platform for repackaging")
+    suffix: str = Field("offline", description="Suffix for the output file")
 
 
 @router.post("/tasks", response_model=TaskResponse)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
-async def create_task(request: Request, task_data: TaskCreate):
-    """Create a new repackaging task"""
+async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
+    """
+    Create a new repackaging task
+    
+    This endpoint supports two modes:
+    
+    1. **Direct URL mode** - Provide a URL to a .difypkg file:
+    ```json
+    {
+        "url": "https://example.com/plugin.difypkg",
+        "platform": "manylinux2014_x86_64",
+        "suffix": "offline"
+    }
+    ```
+    
+    2. **Marketplace mode** - Specify a plugin from Dify Marketplace:
+    ```json
+    {
+        "marketplace_plugin": {
+            "author": "langgenius",
+            "name": "agent",
+            "version": "0.0.9"
+        },
+        "platform": "manylinux2014_x86_64",
+        "suffix": "offline"
+    }
+    ```
+    
+    Parameters:
+    - **url**: Direct URL to the .difypkg file (required if marketplace_plugin not provided)
+    - **marketplace_plugin**: Plugin information from marketplace (required if url not provided)
+    - **platform**: Target platform for repackaging (optional, defaults to auto-detect)
+    - **suffix**: Suffix for output file (optional, defaults to "offline")
+    
+    Returns:
+    - Task ID and initial status for tracking the repackaging progress
+    
+    The task will include marketplace metadata in WebSocket updates when using marketplace mode.
+    """
     try:
         # Generate task ID
         task_id = str(uuid.uuid4())
         
-        # Validate URL
-        if not str(task_data.url).endswith('.difypkg'):
+        # Determine download URL
+        if task_data.marketplace_plugin:
+            # Auto-construct URL from marketplace plugin info
+            if not all(k in task_data.marketplace_plugin for k in ["author", "name", "version"]):
+                raise HTTPException(
+                    status_code=400,
+                    detail="marketplace_plugin must contain author, name, and version"
+                )
+            
+            download_url = MarketplaceService.construct_download_url(
+                task_data.marketplace_plugin["author"],
+                task_data.marketplace_plugin["name"],
+                task_data.marketplace_plugin["version"]
+            )
+            
+            plugin_info = task_data.marketplace_plugin
+        elif task_data.url:
+            # Use direct URL
+            download_url = task_data.url
+            
+            # Validate URL
+            if not download_url.endswith('.difypkg'):
+                raise HTTPException(
+                    status_code=400,
+                    detail="URL must point to a .difypkg file"
+                )
+            
+            plugin_info = None
+        else:
             raise HTTPException(
                 status_code=400,
-                detail="URL must point to a .difypkg file"
+                detail="Either url or marketplace_plugin must be provided"
             )
         
         # Create initial task record
@@ -42,11 +120,14 @@ async def create_task(request: Request, task_data: TaskCreate):
             "task_id": task_id,
             "status": TaskStatus.PENDING.value,
             "created_at": datetime.utcnow().isoformat(),
-            "url": str(task_data.url),
-            "platform": task_data.platform.value,
+            "url": download_url,
+            "platform": task_data.platform,
             "suffix": task_data.suffix,
             "progress": 0
         }
+        
+        if plugin_info:
+            task_record["plugin_info"] = plugin_info
         
         # Store in Redis
         redis_client.setex(
@@ -56,12 +137,32 @@ async def create_task(request: Request, task_data: TaskCreate):
         )
         
         # Queue the task
-        process_repackaging.delay(
-            task_id,
-            str(task_data.url),
-            task_data.platform.value,
-            task_data.suffix
-        )
+        if plugin_info:
+            # Use marketplace-aware task
+            marketplace_metadata = {
+                "source": "marketplace",
+                "author": plugin_info["author"],
+                "name": plugin_info["name"],
+                "version": plugin_info["version"]
+            }
+            
+            process_marketplace_repackaging.delay(
+                task_id,
+                plugin_info["author"],
+                plugin_info["name"],
+                plugin_info["version"],
+                task_data.platform,
+                task_data.suffix,
+                marketplace_metadata
+            )
+        else:
+            # Use regular task for backward compatibility
+            process_repackaging.delay(
+                task_id,
+                download_url,
+                task_data.platform,
+                task_data.suffix
+            )
         
         return TaskResponse(
             task_id=task_id,
@@ -75,6 +176,8 @@ async def create_task(request: Request, task_data: TaskCreate):
             status_code=429,
             detail="Rate limit exceeded. Please try again later."
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error creating task")
         raise HTTPException(status_code=500, detail=str(e))
@@ -83,13 +186,40 @@ async def create_task(request: Request, task_data: TaskCreate):
 @router.post("/tasks/marketplace", response_model=TaskResponse)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def create_marketplace_task(request: Request, task_data: MarketplaceTaskCreate):
-    """Create a new repackaging task from marketplace plugin"""
+    """
+    Create a new repackaging task from marketplace plugin
+    
+    This is a convenience endpoint specifically for marketplace plugins.
+    
+    Example request:
+    ```json
+    {
+        "author": "langgenius",
+        "name": "agent",
+        "version": "0.0.9",
+        "platform": "manylinux2014_x86_64",
+        "suffix": "offline"
+    }
+    ```
+    
+    Parameters:
+    - **author**: Plugin author username from marketplace
+    - **name**: Plugin name identifier  
+    - **version**: Specific version to download
+    - **platform**: Target platform for repackaging (optional)
+    - **suffix**: Suffix for output file (optional, defaults to "offline")
+    
+    Returns:
+    - Task ID and initial status
+    
+    All tasks created through this endpoint will include marketplace metadata in their WebSocket updates.
+    """
     try:
         # Generate task ID
         task_id = str(uuid.uuid4())
         
         # Build download URL
-        download_url = MarketplaceService.build_download_url(
+        download_url = MarketplaceService.construct_download_url(
             task_data.author,
             task_data.name,
             task_data.version
@@ -118,12 +248,22 @@ async def create_marketplace_task(request: Request, task_data: MarketplaceTaskCr
             json.dumps(task_record)
         )
         
-        # Queue the task
-        process_repackaging.delay(
+        # Queue the task with marketplace metadata
+        marketplace_metadata = {
+            "source": "marketplace",
+            "author": task_data.author,
+            "name": task_data.name,
+            "version": task_data.version
+        }
+        
+        process_marketplace_repackaging.delay(
             task_id,
-            download_url,
+            task_data.author,
+            task_data.name,
+            task_data.version,
             task_data.platform.value,
-            task_data.suffix
+            task_data.suffix,
+            marketplace_metadata
         )
         
         return TaskResponse(
@@ -224,7 +364,8 @@ async def list_recent_tasks(limit: int = 10):
                 "task_id": task["task_id"],
                 "status": task["status"],
                 "created_at": task["created_at"],
-                "progress": task.get("progress", 0)
+                "progress": task.get("progress", 0),
+                "plugin_info": task.get("plugin_info")
             })
     
     # Sort by created_at

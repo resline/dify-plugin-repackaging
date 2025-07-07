@@ -28,6 +28,14 @@ class TaskCreate(BaseModel):
     suffix: str = Field("offline", description="Suffix for the output file")
 
 
+class MarketplaceTaskCreate(BaseModel):
+    author: str = Field(..., description="Plugin author")
+    name: str = Field(..., description="Plugin name")
+    version: str = Field(..., description="Plugin version")
+    platform: Platform = Field(Platform.DEFAULT, description="Target platform for repackaging")
+    suffix: str = Field("offline", description="Suffix for the output file")
+
+
 class TaskResponse(BaseModel):
     task_id: str
     status: TaskStatus

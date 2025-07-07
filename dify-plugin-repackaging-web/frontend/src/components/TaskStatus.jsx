@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, Loader, Download, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Loader, Download, AlertCircle, Package, User, Tag } from 'lucide-react';
 import { taskService, createWebSocket } from '../services/api';
 
 const TaskStatus = ({ taskId, onComplete, onError }) => {
@@ -167,6 +167,35 @@ const TaskStatus = ({ taskId, onComplete, onError }) => {
             <Download className="mr-2 h-4 w-4" />
             Download {task.output_filename || 'Repackaged Plugin'}
           </a>
+        </div>
+      )}
+
+      {/* Plugin metadata if from marketplace */}
+      {task.plugin_metadata && (
+        <div className="mt-4 p-3 bg-gray-50 rounded-md">
+          <div className="flex items-center gap-2 mb-2">
+            <Package className="h-4 w-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">Plugin Information</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">Name:</span>
+              <span className="font-medium">{task.plugin_metadata.name}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <User className="h-3 w-3 text-gray-400" />
+              <span className="text-gray-500">Author:</span>
+              <span className="font-medium">{task.plugin_metadata.author}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Tag className="h-3 w-3 text-gray-400" />
+              <span className="text-gray-500">Version:</span>
+              <span className="font-medium">v{task.plugin_metadata.version}</span>
+            </div>
+          </div>
+          {task.plugin_metadata.description && (
+            <p className="mt-2 text-sm text-gray-600">{task.plugin_metadata.description}</p>
+          )}
         </div>
       )}
 
