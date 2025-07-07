@@ -1,0 +1,67 @@
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    
+    resolver 127.0.0.11 valid=10s;
+    
+    server {
+        listen 80;
+        server_name localhost;
+        
+        # Max upload size
+        client_max_body_size 500M;
+        
+        # Timeouts for large file processing
+        proxy_connect_timeout 600;
+        proxy_send_timeout 600;
+        proxy_read_timeout 600;
+        send_timeout 600;
+        
+        # Frontend
+        location / {
+            set $frontend ${FRONTEND_HOST:-frontend}:${FRONTEND_PORT:-80};
+            proxy_pass http://$frontend;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # API
+        location /api {
+            set $backend ${BACKEND_HOST:-backend}:${BACKEND_PORT:-8000};
+            proxy_pass http://$backend;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # WebSocket
+        location /ws {
+            set $backend ${BACKEND_HOST:-backend}:${BACKEND_PORT:-8000};
+            proxy_pass http://$backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Health check
+        location /health {
+            set $backend ${BACKEND_HOST:-backend}:${BACKEND_PORT:-8000};
+            proxy_pass http://$backend/health;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+        }
+    }
+}

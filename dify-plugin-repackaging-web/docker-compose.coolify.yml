@@ -82,12 +82,20 @@ services:
       retries: 3
 
   nginx:
-    build: ./nginx
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.coolify
     restart: unless-stopped
     # IMPORTANT: No ports mapping! Coolify's Traefik will handle external access
     # Only expose the port internally for container-to-container communication
     expose:
       - "80"
+    environment:
+      # Coolify container naming pattern with UUID
+      - BACKEND_HOST=backend-dsksw044g8g48k8oogsc4css
+      - BACKEND_PORT=8000
+      - FRONTEND_HOST=frontend-dsksw044g8g48k8oogsc4css
+      - FRONTEND_PORT=80
     depends_on:
       - backend
       - frontend

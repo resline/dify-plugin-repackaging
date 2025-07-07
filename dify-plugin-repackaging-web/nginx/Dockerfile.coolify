@@ -1,0 +1,18 @@
+FROM nginx:alpine
+
+# Install envsubst for template processing
+RUN apk add --no-cache gettext
+
+# Copy nginx configuration template
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Expose port
+EXPOSE 80
+
+# Use custom entrypoint
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
