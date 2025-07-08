@@ -68,8 +68,8 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
         marketplaceService.getAuthors().catch(() => ({ authors: [] }))
       ]);
       
-      setCategories(categoriesResult.categories || []);
-      setAuthors(authorsResult.authors || []);
+      setCategories(Array.isArray(categoriesResult.categories) ? categoriesResult.categories : []);
+      setAuthors(Array.isArray(authorsResult.authors) ? authorsResult.authors : []);
       
       // Initial search
       searchPlugins();
@@ -98,10 +98,13 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
       
       const result = await marketplaceService.searchPlugins(params);
       
-      setPlugins(result.plugins || []);
+      // Ensure plugins is always an array
+      const plugins = Array.isArray(result.plugins) ? result.plugins : [];
+      
+      setPlugins(plugins);
       setTotalPages(Math.ceil((result.total || 0) / (result.per_page || 12)));
       
-      if (result.plugins && result.plugins.length === 0) {
+      if (plugins.length === 0) {
         setError('No plugins found matching your criteria');
       }
       
@@ -191,7 +194,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">All Categories</option>
-                {categories.map((cat) => (
+                {Array.isArray(categories) && categories.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ')}
                   </option>
@@ -210,7 +213,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">All Authors</option>
-                {authors.map((author) => (
+                {Array.isArray(authors) && authors.map((author) => (
                   <option key={author} value={author}>
                     {author}
                   </option>
@@ -255,7 +258,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {plugins.map((plugin) => (
+          {Array.isArray(plugins) && plugins.map((plugin) => (
             <PluginCard
               key={`${plugin.author}/${plugin.name}`}
               plugin={plugin}
