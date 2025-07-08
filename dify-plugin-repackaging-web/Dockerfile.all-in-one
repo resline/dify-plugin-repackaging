@@ -18,6 +18,10 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     redis-server \
     curl \
+    unzip \
+    jq \
+    wget \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend code
@@ -28,6 +32,11 @@ COPY backend/ ./
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
+
+# Copy plugin repackaging script and binaries
+COPY ../plugin_repackaging.sh /app/scripts/
+COPY ../dify-plugin-* /app/scripts/
+RUN chmod +x /app/scripts/plugin_repackaging.sh /app/scripts/dify-plugin-*
 
 # Create supervisor config
 RUN echo "[supervisord]\n\

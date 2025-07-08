@@ -12,9 +12,12 @@ services:
       - SCRIPTS_DIR=/app/scripts
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-10}
       - FILE_RETENTION_HOURS=${FILE_RETENTION_HOURS:-24}
+      - REDIS_URL=redis://localhost:6379/0
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+      - PYTHONPATH=/app
     volumes:
       - temp-data:/app/temp
-      - ./backend/scripts:/app/scripts:ro
     expose:
       - "80"
     healthcheck:
