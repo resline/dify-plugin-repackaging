@@ -30,6 +30,20 @@ export const taskService = {
     return response.data;
   },
 
+  uploadFile: async (file, platform = '', suffix = 'offline') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('platform', platform);
+    formData.append('suffix', suffix);
+    
+    const response = await api.post('/tasks/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   getTaskStatus: async (taskId) => {
     const response = await api.get(`/tasks/${taskId}`);
     return response.data;
