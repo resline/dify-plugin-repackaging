@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, Filter, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { marketplaceService } from '../services/marketplace';
 import PluginCard from './PluginCard';
+import { CardSkeleton } from './LoadingSkeleton';
 
 interface Plugin {
   author: string;
@@ -236,17 +237,27 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
 
       {/* Error message */}
       {error && !loading && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
+              <button
+                onClick={() => loadInitialData()}
+                className="mt-2 inline-flex items-center gap-1 text-sm text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Try again
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Plugin grid */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-12 space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-          <p className="text-sm text-gray-500">Loading plugins...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CardSkeleton count={6} />
         </div>
       ) : !error && plugins.length === 0 ? (
         <div className="text-center py-12 space-y-3">

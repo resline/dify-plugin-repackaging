@@ -14,8 +14,7 @@ const platforms = [
   { value: 'macosx_11_0_arm64', label: 'macOS ARM64' },
 ];
 
-const UploadForm = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading }) => {
-  const [mode, setMode] = useState('url'); // 'url', 'marketplace', or 'file'
+const UploadForm = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading, currentTab, onTabChange }) => {
   const [url, setUrl] = useState('');
   const [platform, setPlatform] = useState(platforms[0]);
   const [suffix, setSuffix] = useState('offline');
@@ -72,47 +71,7 @@ const UploadForm = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading }) 
 
   return (
     <div className="space-y-6">
-      {/* Mode selector */}
-      <div className="flex rounded-lg shadow-sm" role="group">
-        <button
-          type="button"
-          onClick={() => setMode('url')}
-          className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-lg border ${
-            mode === 'url'
-              ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          <Link className="inline-block w-4 h-4 mr-2" />
-          Direct URL
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('marketplace')}
-          className={`flex-1 px-4 py-2 text-sm font-medium border-t border-b ${
-            mode === 'marketplace'
-              ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          <Store className="inline-block w-4 h-4 mr-2" />
-          Browse Marketplace
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('file')}
-          className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-lg border ${
-            mode === 'file'
-              ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          <File className="inline-block w-4 h-4 mr-2" />
-          Upload File
-        </button>
-      </div>
-
-      {mode === 'url' ? (
+      {currentTab === 'url' ? (
         <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <label htmlFor="url" className="block text-sm font-medium text-gray-700">
@@ -243,7 +202,7 @@ const UploadForm = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading }) 
         )}
       </button>
         </form>
-      ) : mode === 'marketplace' ? (
+      ) : currentTab === 'marketplace' ? (
         <MarketplaceBrowser
           onSelectPlugin={handleMarketplaceSelect}
           platform={platform.value}
