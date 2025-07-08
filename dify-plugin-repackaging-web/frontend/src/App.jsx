@@ -55,6 +55,28 @@ function App() {
     }
   };
 
+  const handleFileSubmit = async (fileData) => {
+    setIsLoading(true);
+    
+    try {
+      const task = await taskService.uploadFile(
+        fileData.file,
+        fileData.platform,
+        fileData.suffix
+      );
+      
+      setCurrentTask(task);
+      toast.success('File upload task created successfully!');
+    } catch (error) {
+      console.error('Error creating file upload task:', error);
+      toast.error(
+        error.response?.data?.detail || 'Failed to upload file. Please try again.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleTaskComplete = (task) => {
     toast.success('Plugin repackaged successfully! You can now download it.');
   };
@@ -110,6 +132,7 @@ function App() {
                 <UploadForm 
                   onSubmit={handleSubmit} 
                   onSubmitMarketplace={handleMarketplaceSubmit}
+                  onSubmitFile={handleFileSubmit}
                   isLoading={isLoading} 
                 />
                 
@@ -120,7 +143,7 @@ function App() {
                   <ol className="space-y-2 text-sm text-gray-600">
                     <li className="flex">
                       <span className="font-semibold mr-2">1.</span>
-                      Enter the URL of a .difypkg file from Dify Marketplace or GitHub
+                      Choose your source: Enter URL, browse Marketplace, or upload a .difypkg file
                     </li>
                     <li className="flex">
                       <span className="font-semibold mr-2">2.</span>
@@ -145,6 +168,7 @@ function App() {
                     <li>• Dify Marketplace (marketplace.dify.ai)</li>
                     <li>• GitHub Releases (github.com)</li>
                     <li>• Direct URLs to .difypkg files</li>
+                    <li>• Local .difypkg files (upload from your computer)</li>
                   </ul>
                 </div>
               </>

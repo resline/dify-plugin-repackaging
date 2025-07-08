@@ -5,6 +5,7 @@ from app.workers.celery_app import redis_client
 import logging
 import json
 import re
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -126,31 +127,69 @@ class MarketplaceService:
                     return transformed_result
                     
                 except httpx.HTTPError:
-                    # Both APIs are not working - Dify Marketplace has changed
-                    logger.warning("Dify Marketplace API has been updated and is no longer compatible.")
-                    return {
-                        "plugins": [],
-                        "total": 0,
-                        "page": page,
-                        "per_page": per_page,
-                        "error": "Dify Marketplace API has changed. Please use GitHub or local file options instead.",
-                        "api_status": "incompatible"
-                    }
+                    # Both APIs are not working - try web scraping fallback
+                    logger.warning("Dify Marketplace API has been updated, falling back to web scraper.")
+                    try:
+                        from app.services.marketplace_scraper import marketplace_fallback_service
+                        scraped_result = await marketplace_fallback_service.scraper.scrape_plugin_list(
+                            page=page, per_page=per_page, category=category, query=query
+                        )
+                        
+                        # Add API status info
+                        scraped_result["api_status"] = "incompatible"
+                        scraped_result["fallback_used"] = True
+                        scraped_result["fallback_reason"] = "API endpoints changed"
+                        
+                        # Cache the scraped result
+                        MarketplaceService._set_cache(cache_key, scraped_result)
+                        
+                        return scraped_result
+                        
+                    except Exception as scrape_error:
+                        logger.error(f"Web scraping also failed: {scrape_error}")
+                        return {
+                            "plugins": [],
+                            "total": 0,
+                            "page": page,
+                            "per_page": per_page,
+                            "error": "Dify Marketplace API has changed and web scraping failed.",
+                            "api_status": "incompatible"
+                        }
                 
         except httpx.HTTPError as e:
             logger.error(f"Error searching marketplace: {e}")
             logger.warning(f"Both new and old Marketplace API endpoints failed.")
             logger.warning("New API: https://marketplace-plugin.dify.dev/api/v1/plugins/search/advanced")
             logger.warning(f"Old API: {settings.MARKETPLACE_API_URL}/api/v1/plugins")
-            # Return empty result on error
-            return {
-                "plugins": [],
-                "total": 0,
-                "page": page,
-                "per_page": per_page,
-                "error": str(e),
-                "warning": "Unable to connect to Dify Marketplace API. Both endpoints failed."
-            }
+            
+            # Try web scraping as last resort
+            try:
+                from app.services.marketplace_scraper import marketplace_fallback_service
+                scraped_result = await marketplace_fallback_service.scraper.scrape_plugin_list(
+                    page=page, per_page=per_page, category=category, query=query
+                )
+                
+                # Add error info
+                scraped_result["original_error"] = str(e)
+                scraped_result["fallback_used"] = True
+                scraped_result["fallback_reason"] = "All API endpoints failed"
+                
+                # Cache the scraped result
+                MarketplaceService._set_cache(cache_key, scraped_result)
+                
+                return scraped_result
+                
+            except Exception as scrape_error:
+                logger.error(f"Web scraping also failed: {scrape_error}")
+                # Return empty result on error
+                return {
+                    "plugins": [],
+                    "total": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "error": str(e),
+                    "warning": "Unable to connect to Dify Marketplace API. Both endpoints and web scraping failed."
+                }
     
     @staticmethod
     async def get_plugin_details(author: str, name: str) -> Optional[Dict]:
@@ -188,6 +227,25 @@ class MarketplaceService:
                 
         except httpx.HTTPError as e:
             logger.error(f"Error getting plugin details for {author}/{name}: {e}")
+            
+            # Try web scraping fallback
+            try:
+                from app.services.marketplace_scraper import marketplace_fallback_service
+                scraped_details = await marketplace_fallback_service.scraper.scrape_plugin_details(author, name)
+                
+                if scraped_details:
+                    # Add fallback info
+                    scraped_details["fallback_used"] = True
+                    scraped_details["fallback_reason"] = "API request failed"
+                    
+                    # Cache the scraped result
+                    MarketplaceService._set_cache(cache_key, scraped_details)
+                    
+                    return scraped_details
+                    
+            except Exception as scrape_error:
+                logger.error(f"Web scraping also failed for plugin details: {scrape_error}")
+            
             return None
     
     @staticmethod
@@ -225,6 +283,21 @@ class MarketplaceService:
                 
         except httpx.HTTPError as e:
             logger.error(f"Error getting plugin versions for {author}/{name}: {e}")
+            
+            # Try web scraping fallback
+            try:
+                from app.services.marketplace_scraper import marketplace_fallback_service
+                scraped_versions = await marketplace_fallback_service.scraper.scrape_plugin_versions(author, name)
+                
+                if scraped_versions:
+                    # Cache the scraped result
+                    MarketplaceService._set_cache(cache_key, scraped_versions)
+                    
+                    return scraped_versions
+                    
+            except Exception as scrape_error:
+                logger.error(f"Web scraping also failed for plugin versions: {scrape_error}")
+            
             return []
     
     @staticmethod

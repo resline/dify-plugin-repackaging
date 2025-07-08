@@ -26,15 +26,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
 # Create supervisor config
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
-\n\
-[program:redis]\n\
-command=redis-server\n\
-autostart=true\n\
-autorestart=true\n\
 \n\
 [program:backend]\n\
 command=uvicorn app.main:app --host 0.0.0.0 --port 8000\n\
@@ -107,6 +104,12 @@ http {\n\
     }\n\
 }' > /etc/nginx/nginx.conf
 
+# Set environment variables
+ENV REDIS_URL="redis://localhost:6379/0"
+ENV CELERY_BROKER_URL="redis://localhost:6379/0"
+ENV CELERY_RESULT_BACKEND="redis://localhost:6379/0"
+ENV PYTHONPATH=/app
+
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/start.sh"]

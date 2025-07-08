@@ -37,17 +37,29 @@ redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 def update_task_status(task_id: str, status: TaskStatus, progress: int = 0, 
                       message: str = "", error: str = None, output_filename: str = None,
-                      marketplace_metadata: dict = None):
+                      marketplace_metadata: dict = None, original_filename: str = None):
     """Update task status in Redis"""
-    task_data = {
-        "task_id": task_id,
+    # Get existing task data first to preserve fields
+    existing_data = redis_client.get(f"task:{task_id}")
+    if existing_data:
+        task_data = json.loads(existing_data)
+    else:
+        task_data = {"task_id": task_id}
+    
+    # Update fields
+    task_data.update({
         "status": status.value,
         "progress": progress,
         "message": message,
         "updated_at": datetime.utcnow().isoformat(),
-        "error": error,
-        "output_filename": output_filename
-    }
+    })
+    
+    if error is not None:
+        task_data["error"] = error
+    if output_filename is not None:
+        task_data["output_filename"] = output_filename
+    if original_filename is not None:
+        task_data["original_filename"] = original_filename
     
     # Include marketplace metadata if provided
     if marketplace_metadata:
@@ -71,21 +83,27 @@ def update_task_status(task_id: str, status: TaskStatus, progress: int = 0,
 
 
 @celery_app.task(bind=True)
-def process_repackaging(self, task_id: str, url: str, platform: str, suffix: str):
+def process_repackaging(self, task_id: str, url: str, platform: str, suffix: str, is_local_file: bool = False):
     """Main Celery task for processing repackaging requests"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
     try:
-        # Update status to downloading
-        update_task_status(task_id, TaskStatus.DOWNLOADING, 5, "Starting download...")
-        
-        # Download file
-        file_path, filename = loop.run_until_complete(
-            DownloadService.download_file(url, task_id)
-        )
-        
-        update_task_status(task_id, TaskStatus.PROCESSING, 15, f"Downloaded {filename}")
+        if is_local_file:
+            # For uploaded files, url is actually the local file path
+            file_path = url
+            filename = os.path.basename(file_path)
+            update_task_status(task_id, TaskStatus.PROCESSING, 10, f"Processing uploaded file: {filename}")
+        else:
+            # Update status to downloading
+            update_task_status(task_id, TaskStatus.DOWNLOADING, 5, "Starting download...")
+            
+            # Download file
+            file_path, filename = loop.run_until_complete(
+                DownloadService.download_file(url, task_id)
+            )
+            
+            update_task_status(task_id, TaskStatus.PROCESSING, 15, f"Downloaded {filename}")
         
         # Process repackaging
         async def run_repackaging():

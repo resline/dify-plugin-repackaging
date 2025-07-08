@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from app.models.task import TaskCreate, TaskResponse, TaskStatus, MarketplaceTaskCreate
 from app.workers.celery_app import process_repackaging, process_marketplace_repackaging, redis_client
@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 import uuid
 import json
 import os
+import shutil
 from datetime import datetime
 import logging
 
@@ -312,6 +313,112 @@ async def create_marketplace_task(request: Request, task_data: MarketplaceTaskCr
     except Exception as e:
         logger.exception("Error creating marketplace task")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/tasks/upload", response_model=TaskResponse)
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
+async def upload_task(
+    request: Request,
+    file: UploadFile = File(...),
+    platform: str = Form(""),
+    suffix: str = Form("offline")
+):
+    """
+    Create a new repackaging task by uploading a .difypkg file
+    
+    This endpoint allows you to upload a .difypkg file directly from your computer
+    for repackaging with offline dependencies.
+    
+    Parameters:
+    - **file**: The .difypkg file to upload (required)
+    - **platform**: Target platform for repackaging (optional, defaults to auto-detect)
+    - **suffix**: Suffix for output file (optional, defaults to "offline")
+    
+    File restrictions:
+    - Must have .difypkg extension
+    - Maximum size: 100MB
+    
+    Returns:
+    - Task ID and initial status for tracking the repackaging progress
+    """
+    try:
+        # Validate file extension
+        if not file.filename.endswith('.difypkg'):
+            raise HTTPException(
+                status_code=400,
+                detail="Only .difypkg files are allowed"
+            )
+        
+        # Check file size (100MB limit)
+        file.file.seek(0, 2)  # Move to end of file
+        file_size = file.file.tell()
+        file.file.seek(0)  # Reset to beginning
+        
+        if file_size > 100 * 1024 * 1024:  # 100MB
+            raise HTTPException(
+                status_code=400,
+                detail="File size must be less than 100MB"
+            )
+        
+        # Generate task ID
+        task_id = str(uuid.uuid4())
+        
+        # Create task directory
+        task_dir = os.path.join(settings.TEMP_DIR, task_id)
+        os.makedirs(task_dir, exist_ok=True)
+        
+        # Save uploaded file
+        file_path = os.path.join(task_dir, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Create initial task record
+        task_record = {
+            "task_id": task_id,
+            "status": TaskStatus.PENDING.value,
+            "created_at": datetime.utcnow().isoformat(),
+            "url": f"file://{file_path}",
+            "platform": platform,
+            "suffix": suffix,
+            "progress": 0,
+            "original_filename": file.filename,
+            "upload_info": {
+                "source": "upload",
+                "filename": file.filename,
+                "size": file_size
+            }
+        }
+        
+        # Store in Redis
+        redis_client.setex(
+            f"task:{task_id}",
+            settings.FILE_RETENTION_HOURS * 3600,
+            json.dumps(task_record)
+        )
+        
+        # Queue the task - using local file path
+        process_repackaging.delay(
+            task_id,
+            file_path,  # Use local file path instead of URL
+            platform,
+            suffix,
+            is_local_file=True  # Flag to indicate it's a local file
+        )
+        
+        logger.info(f"Created upload task {task_id} for file {file.filename}")
+        
+        return TaskResponse(
+            task_id=task_id,
+            status=TaskStatus.PENDING,
+            created_at=datetime.utcnow(),
+            progress=0
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error creating upload task")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
