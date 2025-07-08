@@ -1,36 +1,12 @@
 import httpx
 import os
 from urllib.parse import urlparse
-from typing import Tuple, Optional, Dict
+from typing import Tuple
 from app.core.config import settings
 import aiofiles
-import re
 
 
 class DownloadService:
-    @staticmethod
-    def parse_marketplace_url(url: str) -> Optional[Dict[str, str]]:
-        """
-        Parse marketplace URL to extract plugin info
-        Example: https://marketplace.dify.ai/plugins/langgenius/openai_api_compatible
-        Returns: {"author": "langgenius", "name": "openai_api_compatible"} or None
-        """
-        parsed = urlparse(url)
-        domain = parsed.netloc.lower()
-        
-        # Check if it's a marketplace URL
-        if domain in ["marketplace.dify.ai", "www.marketplace.dify.ai"]:
-            # Extract plugin info from path
-            # Path format: /plugins/{author}/{name}
-            path_match = re.match(r'^/plugins/([^/]+)/([^/]+)/?$', parsed.path)
-            if path_match:
-                return {
-                    "author": path_match.group(1),
-                    "name": path_match.group(2)
-                }
-        
-        return None
-    
     @staticmethod
     def validate_url(url: str) -> bool:
         """Validate if URL is from allowed domains"""
