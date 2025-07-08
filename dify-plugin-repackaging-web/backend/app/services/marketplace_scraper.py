@@ -24,7 +24,7 @@ class MarketplaceScraper:
     
     def __init__(self):
         self.base_url = "https://marketplace.dify.ai"
-        self.api_base_url = "https://marketplace-plugin.dify.dev"
+        self.api_base_url = "https://marketplace.dify.ai"  # Updated to match new API
         self.cache_prefix = "marketplace_scraper"
         self.cache_ttl = 3600  # 1 hour
         self.retry_count = 3

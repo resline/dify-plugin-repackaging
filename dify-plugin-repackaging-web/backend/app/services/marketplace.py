@@ -6,12 +6,28 @@ import logging
 import json
 import re
 import asyncio
+from app.utils.circuit_breaker import marketplace_circuit_breaker, CircuitOpenError
 
 logger = logging.getLogger(__name__)
 
 
 class MarketplaceService:
     """Service for interacting with Dify Marketplace API"""
+    
+    @staticmethod
+    async def _make_api_request(client: httpx.AsyncClient, method: str, url: str, **kwargs):
+        """Make an API request with circuit breaker protection"""
+        async def _request():
+            if method.upper() == "GET":
+                response = await client.get(url, **kwargs)
+            elif method.upper() == "POST":
+                response = await client.post(url, **kwargs)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+            response.raise_for_status()
+            return response
+        
+        return await marketplace_circuit_breaker.async_call(_request)
     
     @staticmethod
     def _get_cache_key(endpoint: str, params: dict = None) -> str:
@@ -87,7 +103,7 @@ class MarketplaceService:
         
         try:
             # Try the new API endpoint first
-            marketplace_api_url = "https://marketplace-plugin.dify.dev"
+            marketplace_api_url = "https://marketplace.dify.ai"
             
             # Build request body for the new API
             request_body = {
@@ -101,15 +117,21 @@ class MarketplaceService:
                 "type": "plugin"
             }
             
+            # Add author filter if provided
+            if author:
+                request_body["author"] = author
+            
             # Make API request to the new endpoint
             async with httpx.AsyncClient(timeout=30.0) as client:
                 try:
-                    # Try the new search endpoint
-                    response = await client.post(
+                    # Try the new search endpoint with circuit breaker
+                    response = await MarketplaceService._make_api_request(
+                        client,
+                        "POST",
                         f"{marketplace_api_url}/api/v1/plugins/search/advanced",
-                        json=request_body
+                        json=request_body,
+                        headers={"Content-Type": "application/json"}
                     )
-                    response.raise_for_status()
                     
                     result = response.json()
                     
@@ -126,9 +148,12 @@ class MarketplaceService:
                     
                     return transformed_result
                     
-                except httpx.HTTPError:
-                    # Both APIs are not working - try web scraping fallback
-                    logger.warning("Dify Marketplace API has been updated, falling back to web scraper.")
+                except (httpx.HTTPError, CircuitOpenError) as e:
+                    # API is not working - try web scraping fallback
+                    if isinstance(e, CircuitOpenError):
+                        logger.warning("Circuit breaker is open, falling back to web scraper.")
+                    else:
+                        logger.warning("Dify Marketplace API has been updated, falling back to web scraper.")
                     try:
                         from app.services.marketplace_scraper import marketplace_fallback_service
                         scraped_result = await marketplace_fallback_service.scraper.scrape_plugin_list(
@@ -212,20 +237,41 @@ class MarketplaceService:
             return cached_result
         
         try:
+            # First try to get details from search results
+            # Since the direct plugin detail API returns 404, we use search
+            search_result = await MarketplaceService.search_plugins(
+                query=name,
+                author=author,
+                per_page=1
+            )
+            
+            if search_result.get("plugins"):
+                # Find the exact match in search results
+                for plugin in search_result["plugins"]:
+                    if plugin.get("author") == author and plugin.get("name") == name:
+                        # Cache and return the plugin details
+                        MarketplaceService._set_cache(cache_key, plugin)
+                        return plugin
+            
+            # If not found in search, try direct API (might work for some plugins)
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{settings.MARKETPLACE_API_URL}/api/v1/plugins/{author}/{name}"
-                )
-                response.raise_for_status()
+                try:
+                    response = await client.get(
+                        f"{settings.MARKETPLACE_API_URL}/api/v1/plugins/{author}/{name}"
+                    )
+                    response.raise_for_status()
+                    
+                    result = response.json()
+                    
+                    # Cache the result
+                    MarketplaceService._set_cache(cache_key, result)
+                    
+                    return result
+                except httpx.HTTPError:
+                    # Direct API failed, continue to fallback
+                    pass
                 
-                result = response.json()
-                
-                # Cache the result
-                MarketplaceService._set_cache(cache_key, result)
-                
-                return result
-                
-        except httpx.HTTPError as e:
+        except Exception as e:
             logger.error(f"Error getting plugin details for {author}/{name}: {e}")
             
             # Try web scraping fallback

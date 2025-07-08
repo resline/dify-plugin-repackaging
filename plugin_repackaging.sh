@@ -137,7 +137,15 @@ repackage(){
 	fi
 	cd ${CURR_DIR}
 	chmod 755 ${CURR_DIR}/${CMD_NAME}
-	${CURR_DIR}/${CMD_NAME} plugin package ${CURR_DIR}/${PACKAGE_NAME} -o ${CURR_DIR}/${PACKAGE_NAME}-${PACKAGE_SUFFIX}.difypkg
+	if ! ${CURR_DIR}/${CMD_NAME} plugin package ${CURR_DIR}/${PACKAGE_NAME} -o ${CURR_DIR}/${PACKAGE_NAME}-${PACKAGE_SUFFIX}.difypkg; then
+		echo "Error: Repackaging failed"
+		exit 1
+	fi
+	# Verify output file exists
+	if [ ! -f "${CURR_DIR}/${PACKAGE_NAME}-${PACKAGE_SUFFIX}.difypkg" ]; then
+		echo "Error: Output file not created"
+		exit 1
+	fi
 	echo "Repackage success."
 }
 

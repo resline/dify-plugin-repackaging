@@ -1,4 +1,6 @@
 ## Dify 1.0 Plugin Downloading and Repackaging
+
+> **⚠️ Important Notice**: Dify Marketplace search/listing API is currently unavailable due to recent changes. However, direct plugin downloads still work if you know the plugin author, name, and version. For plugin discovery, please use the [Dify Marketplace website](https://marketplace.dify.ai) or GitHub releases.
 ### How To Use With Docker
 
 1.change param in dockerfile

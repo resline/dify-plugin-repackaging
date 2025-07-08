@@ -30,12 +30,13 @@ class RepackageService:
         
         logger.info(f"Running command: {' '.join(cmd)}")
         
-        # Run the script
+        # Run the script from the script's directory
+        # This ensures output files are created in the expected location
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
-            cwd=os.path.dirname(file_path)
+            cwd=settings.SCRIPTS_DIR
         )
         
         # Progress tracking
@@ -74,9 +75,9 @@ class RepackageService:
         if process.returncode != 0:
             raise RuntimeError(f"Repackaging failed with exit code {process.returncode}")
         
-        # Find the output file
+        # Find the output file in the scripts directory
         output_filename = RepackageService._find_output_file(
-            os.path.dirname(file_path),
+            settings.SCRIPTS_DIR,
             os.path.basename(file_path),
             suffix
         )
