@@ -113,8 +113,8 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
                 
                 if not latest_version:
                     raise HTTPException(
-                        status_code=404,
-                        detail=f"Could not find plugin {author}/{name} in marketplace or unable to determine latest version"
+                        status_code=503,
+                        detail=f"Dify Marketplace API is currently unavailable. Please use GitHub releases or direct .difypkg file URLs instead."
                     )
                 
                 # Build download URL with latest version

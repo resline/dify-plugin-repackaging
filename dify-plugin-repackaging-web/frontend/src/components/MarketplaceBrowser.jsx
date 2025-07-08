@@ -76,7 +76,12 @@ const MarketplaceBrowser = ({ onSelectPlugin, platform, suffix }) => {
       setPlugins(result.plugins || []);
       setTotalPages(Math.ceil((result.total || 0) / (result.per_page || 12)));
       
-      if (result.plugins && result.plugins.length === 0) {
+      // Check for API status issues
+      if (result.api_status === 'incompatible' || result.api_status === 'changed') {
+        setError('Dify Marketplace API has been updated. Please use GitHub or local file options for plugin repackaging.');
+      } else if (result.error && typeof result.error === 'string') {
+        setError(result.error);
+      } else if (result.plugins && result.plugins.length === 0) {
         setError('No plugins found matching your criteria');
       }
       

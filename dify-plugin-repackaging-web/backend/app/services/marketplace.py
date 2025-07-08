@@ -85,30 +85,71 @@ class MarketplaceService:
             params["category"] = category
         
         try:
-            # Make API request
+            # Try the new API endpoint first
+            marketplace_api_url = "https://marketplace-plugin.dify.dev"
+            
+            # Build request body for the new API
+            request_body = {
+                "page": page,
+                "page_size": per_page,
+                "query": query or "",
+                "sort_by": "install_count",
+                "sort_order": "DESC",
+                "category": category or "",
+                "tags": [],
+                "type": "plugin"
+            }
+            
+            # Make API request to the new endpoint
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{settings.MARKETPLACE_API_URL}/api/v1/plugins",
-                    params=params
-                )
-                response.raise_for_status()
-                
-                result = response.json()
-                
-                # Cache the result
-                MarketplaceService._set_cache(cache_key, result)
-                
-                return result
+                try:
+                    # Try the new search endpoint
+                    response = await client.post(
+                        f"{marketplace_api_url}/api/v1/plugins/search/advanced",
+                        json=request_body
+                    )
+                    response.raise_for_status()
+                    
+                    result = response.json()
+                    
+                    # Transform the response to match our expected format
+                    transformed_result = {
+                        "plugins": result.get("data", []),
+                        "total": result.get("total", 0),
+                        "page": page,
+                        "per_page": per_page
+                    }
+                    
+                    # Cache the result
+                    MarketplaceService._set_cache(cache_key, transformed_result)
+                    
+                    return transformed_result
+                    
+                except httpx.HTTPError:
+                    # Both APIs are not working - Dify Marketplace has changed
+                    logger.warning("Dify Marketplace API has been updated and is no longer compatible.")
+                    return {
+                        "plugins": [],
+                        "total": 0,
+                        "page": page,
+                        "per_page": per_page,
+                        "error": "Dify Marketplace API has changed. Please use GitHub or local file options instead.",
+                        "api_status": "incompatible"
+                    }
                 
         except httpx.HTTPError as e:
             logger.error(f"Error searching marketplace: {e}")
+            logger.warning(f"Both new and old Marketplace API endpoints failed.")
+            logger.warning("New API: https://marketplace-plugin.dify.dev/api/v1/plugins/search/advanced")
+            logger.warning(f"Old API: {settings.MARKETPLACE_API_URL}/api/v1/plugins")
             # Return empty result on error
             return {
                 "plugins": [],
                 "total": 0,
                 "page": page,
                 "per_page": per_page,
-                "error": str(e)
+                "error": str(e),
+                "warning": "Unable to connect to Dify Marketplace API. Both endpoints failed."
             }
     
     @staticmethod
