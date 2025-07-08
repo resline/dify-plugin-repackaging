@@ -33,10 +33,12 @@ COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Copy plugin repackaging script and binaries
-COPY ../plugin_repackaging.sh /app/scripts/
-COPY ../dify-plugin-* /app/scripts/
-RUN chmod +x /app/scripts/plugin_repackaging.sh /app/scripts/dify-plugin-*
+# Create scripts directory and download dify-plugin binaries
+RUN mkdir -p /app/scripts && \
+    cd /app/scripts && \
+    wget -q https://github.com/resline/dify-plugin-repackaging/raw/main/dify-plugin-linux-amd64-5g && \
+    wget -q https://github.com/resline/dify-plugin-repackaging/raw/main/plugin_repackaging.sh && \
+    chmod +x dify-plugin-linux-amd64-5g plugin_repackaging.sh
 
 # Create supervisor config
 RUN echo "[supervisord]\n\
