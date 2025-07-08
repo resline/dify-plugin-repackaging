@@ -50,10 +50,16 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
     
     if (!url) {
       newErrors.url = 'URL is required';
-    } else if (!url.endsWith('.difypkg')) {
-      newErrors.url = 'URL must point to a .difypkg file';
     } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
       newErrors.url = 'URL must start with http:// or https://';
+    } else {
+      // Check if it's a valid URL type
+      const isMarketplaceUrl = url.includes('marketplace.dify.ai/plugins/');
+      const isDifypkgUrl = url.endsWith('.difypkg');
+      
+      if (!isMarketplaceUrl && !isDifypkgUrl) {
+        newErrors.url = 'URL must point to a .difypkg file or be a Dify Marketplace plugin URL';
+      }
     }
     
     if (!suffix) {
@@ -128,7 +134,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
                 className={`block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
                   errors.url ? 'border-red-300' : 'border-gray-300'
                 }`}
-                placeholder="https://marketplace.dify.ai/plugins/example.difypkg"
+                placeholder="https://marketplace.dify.ai/plugins/langgenius/agent"
                 disabled={isLoading}
               />
             </div>
@@ -136,7 +142,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
               <p className="mt-2 text-sm text-red-600">{errors.url}</p>
             )}
             <p className="mt-2 text-sm text-gray-500">
-              Enter the URL of a .difypkg file from Dify Marketplace or GitHub
+              Enter a Dify Marketplace plugin URL (e.g. https://marketplace.dify.ai/plugins/langgenius/agent) or direct .difypkg file URL
             </p>
           </div>
 

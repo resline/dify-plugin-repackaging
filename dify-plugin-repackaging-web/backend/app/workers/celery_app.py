@@ -67,6 +67,9 @@ def update_task_status(task_id: str, status: TaskStatus, progress: int = 0,
     
     if status == TaskStatus.COMPLETED:
         task_data["completed_at"] = datetime.utcnow().isoformat()
+        # Generate download URL if output file exists
+        if output_filename:
+            task_data["download_url"] = f"/api/v1/tasks/{task_id}/download"
     
     # Store in Redis
     redis_client.setex(

@@ -85,6 +85,17 @@ class RepackageService:
         if not output_filename:
             raise RuntimeError("Output file not found after repackaging")
         
+        # Move the output file to the task directory
+        source_path = os.path.join(settings.SCRIPTS_DIR, output_filename)
+        task_dir = os.path.join(settings.TEMP_DIR, task_id)
+        os.makedirs(task_dir, exist_ok=True)
+        dest_path = os.path.join(task_dir, output_filename)
+        
+        # Move the file
+        import shutil
+        shutil.move(source_path, dest_path)
+        logger.info(f"Moved output file from {source_path} to {dest_path}")
+        
         yield (f"Output file: {output_filename}", 100)
     
     @staticmethod

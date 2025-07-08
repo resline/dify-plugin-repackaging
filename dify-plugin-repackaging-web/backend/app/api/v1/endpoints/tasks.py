@@ -103,9 +103,11 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
             plugin_info = task_data.marketplace_plugin
         elif task_data.url:
             # Check if it's a marketplace URL without version
+            logger.info(f"Checking if URL is a marketplace URL: {task_data.url}")
             marketplace_info = MarketplaceService.parse_marketplace_url(task_data.url)
             
             if marketplace_info:
+                logger.info(f"Marketplace URL detected: {marketplace_info}")
                 # It's a marketplace URL - extract author and name
                 author, name = marketplace_info
                 
@@ -115,7 +117,7 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
                 if not latest_version:
                     raise HTTPException(
                         status_code=503,
-                        detail=f"Dify Marketplace API is currently unavailable. Please use GitHub releases or direct .difypkg file URLs instead."
+                        detail=f"Unable to fetch plugin version for {author}/{name}. The marketplace API may be unavailable or the plugin may not exist. Please check the URL or use a direct .difypkg file URL instead."
                     )
                 
                 # Build download URL with latest version
@@ -131,13 +133,14 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
                 logger.info(f"Resolved marketplace URL to: {author}/{name} v{latest_version}")
             else:
                 # Regular direct URL
+                logger.info(f"Not a marketplace URL, treating as direct download: {task_data.url}")
                 download_url = task_data.url
                 
                 # Validate URL
                 if not download_url.endswith('.difypkg'):
                     raise HTTPException(
                         status_code=400,
-                        detail="URL must point to a .difypkg file or be a valid marketplace plugin URL"
+                        detail="URL must point to a .difypkg file or be a valid marketplace plugin URL (e.g., https://marketplace.dify.ai/plugins/author/name)"
                     )
                 
                 plugin_info = None
