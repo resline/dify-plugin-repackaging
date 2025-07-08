@@ -1,5 +1,6 @@
 import httpx
 from typing import List, Dict, Optional, Tuple
+from urllib.parse import urlparse
 from app.core.config import settings
 from app.workers.celery_app import redis_client
 import logging
@@ -403,21 +404,21 @@ class MarketplaceService:
         # Remove query parameters
         url_without_query = url.split('?')[0].strip()
         
-        # Remove settings.MARKETPLACE_API_URL to handle both production and custom URLs
-        marketplace_base = settings.MARKETPLACE_API_URL.rstrip('/')
-        # Remove protocol to make matching easier
-        marketplace_host = marketplace_base.replace('https://', '').replace('http://', '')
+        # Parse the URL to extract components
+        parsed = urlparse(url_without_query)
         
-        # Pattern to match marketplace plugin URLs
-        pattern = rf'^https?://{re.escape(marketplace_host)}/plugins/([^/]+)/([^/]+)/?$'
+        # Check if it's a marketplace URL
+        if parsed.netloc in ['marketplace.dify.ai', 'www.marketplace.dify.ai']:
+            # Extract plugin info from path
+            # Path format: /plugins/{author}/{name}
+            path_match = re.match(r'^/plugins/([^/]+)/([^/]+)/?$', parsed.path)
+            if path_match:
+                author = path_match.group(1)
+                name = path_match.group(2)
+                logger.info(f"Parsed marketplace URL: author={author}, name={name}")
+                return (author, name)
         
-        match = re.match(pattern, url_without_query)
-        if match:
-            author = match.group(1)
-            name = match.group(2)
-            logger.info(f"Parsed marketplace URL: author={author}, name={name}")
-            return (author, name)
-        
+        logger.info(f"Not a marketplace URL: {url_without_query}")
         return None
     
     @staticmethod
