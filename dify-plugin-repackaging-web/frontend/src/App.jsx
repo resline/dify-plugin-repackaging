@@ -56,10 +56,10 @@ function AppContent() {
       
       setCurrentTask(task);
       success('Marketplace task created successfully!');
-    } catch (error) {
-      console.error('Error creating marketplace task:', error);
+    } catch (err) {
+      console.error('Error creating marketplace task:', err);
       error(
-        error.response?.data?.detail || 'Failed to create task. Please try again.'
+        err.response?.data?.detail || 'Failed to create task. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -78,10 +78,10 @@ function AppContent() {
       
       setCurrentTask(task);
       success('File upload task created successfully!');
-    } catch (error) {
-      console.error('Error creating file upload task:', error);
+    } catch (err) {
+      console.error('Error creating file upload task:', err);
       error(
-        error.response?.data?.detail || 'Failed to upload file. Please try again.'
+        err.response?.data?.detail || 'Failed to upload file. Please try again.'
       );
     } finally {
       setIsLoading(false);
