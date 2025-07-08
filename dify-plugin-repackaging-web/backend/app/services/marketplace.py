@@ -349,7 +349,9 @@ class MarketplaceService:
     @staticmethod
     def build_download_url(author: str, name: str, version: str) -> str:
         """Build the download URL for a specific plugin version"""
-        return f"{settings.MARKETPLACE_API_URL}/api/v1/plugins/{author}/{name}/{version}/download"
+        # Use the hardcoded marketplace URL for downloads
+        marketplace_api_url = "https://marketplace.dify.ai"
+        return f"{marketplace_api_url}/api/v1/plugins/{author}/{name}/{version}/download"
     
     @staticmethod
     def construct_download_url(author: str, name: str, version: str) -> str:
@@ -393,10 +395,14 @@ class MarketplaceService:
         Supports URLs like:
         - https://marketplace.dify.ai/plugins/langgenius/ollama
         - http://marketplace.dify.ai/plugins/langgenius/ollama/
+        - https://marketplace.dify.ai/plugins/langgenius/openai_api_compatible?source=...
         
         Returns:
             Tuple of (author, name) if valid marketplace URL, None otherwise
         """
+        # Remove query parameters
+        url_without_query = url.split('?')[0].strip()
+        
         # Remove settings.MARKETPLACE_API_URL to handle both production and custom URLs
         marketplace_base = settings.MARKETPLACE_API_URL.rstrip('/')
         # Remove protocol to make matching easier
@@ -405,7 +411,7 @@ class MarketplaceService:
         # Pattern to match marketplace plugin URLs
         pattern = rf'^https?://{re.escape(marketplace_host)}/plugins/([^/]+)/([^/]+)/?$'
         
-        match = re.match(pattern, url.strip())
+        match = re.match(pattern, url_without_query)
         if match:
             author = match.group(1)
             name = match.group(2)
@@ -429,23 +435,41 @@ class MarketplaceService:
         try:
             logger.info(f"Getting latest version for {author}/{name}")
             
-            # Try to get plugin details which includes latest_version
+            # Use the new API endpoint format
+            marketplace_api_url = "https://marketplace.dify.ai"
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{marketplace_api_url}/api/v1/plugins/{author}/{name}",
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    # Extract latest_version from the new API response format
+                    if result.get("code") == 0 and "data" in result:
+                        plugin_data = result["data"].get("plugin", {})
+                        latest_version = plugin_data.get("latest_version")
+                        
+                        if latest_version:
+                            logger.info(f"Found latest version: {latest_version}")
+                            return latest_version
+                        else:
+                            logger.warning(f"No latest_version in response for {author}/{name}")
+                    else:
+                        logger.warning(f"Invalid API response for {author}/{name}: {result}")
+                else:
+                    logger.warning(f"API returned status {response.status_code} for {author}/{name}")
+            
+            # Fallback to old method if new API fails
+            logger.info(f"Trying fallback method for {author}/{name}")
             plugin_details = await MarketplaceService.get_plugin_details(author, name)
             
             if plugin_details and 'latest_version' in plugin_details:
                 logger.info(f"Found latest version in plugin details: {plugin_details['latest_version']}")
                 return plugin_details['latest_version']
             
-            # Fallback to getting versions list
-            logger.info(f"Fetching versions list for {author}/{name}")
-            versions = await MarketplaceService.get_plugin_versions(author, name)
-            
-            if versions and len(versions) > 0:
-                # Versions are typically returned sorted with latest first
-                latest = versions[0].get('version')
-                logger.info(f"Found latest version from versions list: {latest}")
-                return latest
-                
             logger.warning(f"No versions found for {author}/{name}")
             return None
             
