@@ -170,7 +170,8 @@ class MarketplaceService:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{settings.MARKETPLACE_API_URL}/api/v1/plugins/{author}/{name}/versions"
+                    f"{settings.MARKETPLACE_API_URL}/api/v1/plugins/{author}/{name}/versions",
+                    params={"page": 1, "page_size": 20}  # Add required pagination params
                 )
                 response.raise_for_status()
                 
@@ -266,20 +267,28 @@ class MarketplaceService:
             Latest version string if found, None otherwise
         """
         try:
+            logger.info(f"Getting latest version for {author}/{name}")
+            
             # Try to get plugin details which includes latest_version
             plugin_details = await MarketplaceService.get_plugin_details(author, name)
             
             if plugin_details and 'latest_version' in plugin_details:
+                logger.info(f"Found latest version in plugin details: {plugin_details['latest_version']}")
                 return plugin_details['latest_version']
             
             # Fallback to getting versions list
+            logger.info(f"Fetching versions list for {author}/{name}")
             versions = await MarketplaceService.get_plugin_versions(author, name)
+            
             if versions and len(versions) > 0:
                 # Versions are typically returned sorted with latest first
-                return versions[0].get('version')
+                latest = versions[0].get('version')
+                logger.info(f"Found latest version from versions list: {latest}")
+                return latest
                 
+            logger.warning(f"No versions found for {author}/{name}")
             return None
             
         except Exception as e:
-            logger.error(f"Error getting latest version for {author}/{name}: {e}")
+            logger.error(f"Error getting latest version for {author}/{name}: {e}", exc_info=True)
             return None

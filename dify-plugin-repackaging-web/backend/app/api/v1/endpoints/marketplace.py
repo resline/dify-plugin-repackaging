@@ -149,6 +149,26 @@ async def get_categories():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/marketplace/authors")
+async def get_authors():
+    """Get list of unique plugin authors from marketplace"""
+    try:
+        # Get first page of plugins with max results to extract authors
+        result = await MarketplaceService.search_plugins(page=1, per_page=100)
+        plugins = result.get('plugins', [])
+        
+        # Extract unique authors
+        authors = list(set(plugin.get('author', '') for plugin in plugins if plugin.get('author')))
+        authors.sort()
+        
+        return {"authors": authors}
+        
+    except Exception as e:
+        logger.exception("Error getting authors")
+        # Return empty list instead of raising error to prevent frontend issues
+        return {"authors": []}
+
+
 @router.post("/marketplace/plugins/{author}/{name}/{version}/download-url")
 async def get_download_url(author: str, name: str, version: str):
     """
