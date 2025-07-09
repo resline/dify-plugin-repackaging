@@ -207,6 +207,44 @@ class FileManager:
             return cleaned_count
     
     @staticmethod
+    def delete_file(task_id: str) -> bool:
+        """
+        Delete a specific file and its task directory
+        
+        Args:
+            task_id: The task ID (same as file ID)
+            
+        Returns:
+            True if file was deleted successfully, False otherwise
+        """
+        try:
+            # Get task data from Redis
+            task_data = redis_client.get(f"task:{task_id}")
+            if not task_data:
+                logger.warning(f"Task {task_id} not found in Redis")
+                return False
+            
+            task = json.loads(task_data)
+            
+            # Build directory path
+            task_dir = os.path.join(settings.TEMP_DIR, task_id)
+            
+            # Delete the directory and all its contents
+            if os.path.exists(task_dir):
+                shutil.rmtree(task_dir)
+                logger.info(f"Deleted task directory: {task_dir}")
+            
+            # Remove task from Redis
+            redis_client.delete(f"task:{task_id}")
+            logger.info(f"Removed task {task_id} from Redis")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting file for task {task_id}: {e}")
+            return False
+    
+    @staticmethod
     def get_storage_stats() -> Dict:
         """
         Get storage statistics for the temp directory

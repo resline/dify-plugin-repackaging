@@ -170,6 +170,54 @@ async def get_storage_stats():
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@router.delete("/files/{file_id}")
+async def delete_file(file_id: str):
+    """
+    Delete a specific file
+    
+    Parameters:
+    - **file_id**: The unique identifier of the file to delete (same as task_id)
+    
+    Returns:
+    - Success message if file was deleted
+    
+    Errors:
+    - **404**: File not found
+    - **500**: Internal server error
+    """
+    try:
+        # Check if file exists
+        file_info = FileManager.get_file_info(file_id)
+        
+        if not file_info:
+            raise HTTPException(
+                status_code=404,
+                detail="File not found or already deleted"
+            )
+        
+        # Delete the file
+        success = FileManager.delete_file(file_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to delete file"
+            )
+        
+        logger.info(f"File {file_id} deleted successfully")
+        
+        return {
+            "message": "File deleted successfully",
+            "file_id": file_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting file {file_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @router.delete("/files/cleanup")
 async def cleanup_old_files(
     retention_days: Optional[int] = Query(

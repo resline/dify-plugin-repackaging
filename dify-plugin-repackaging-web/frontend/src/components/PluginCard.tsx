@@ -116,8 +116,10 @@ const PluginCard: React.FC<PluginCardProps> = ({
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
-                const sibling = target.nextSibling as HTMLElement;
-                if (sibling) sibling.style.display = 'flex';
+                if (target.nextSibling) {
+                  const sibling = target.nextSibling as HTMLElement;
+                  sibling.style.display = 'flex';
+                }
               }}
             />
           ) : null}

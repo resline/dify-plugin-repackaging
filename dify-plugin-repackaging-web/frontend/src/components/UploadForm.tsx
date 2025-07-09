@@ -128,7 +128,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
                 Plugin URL
               </label>
               <div className="group relative">
-                <Info className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                <Info className="h-3.5 w-3.5 text-gray-500 cursor-help" />
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
                   <div className="text-left">
                     <p className="font-semibold mb-1">Download Limits:</p>
@@ -143,14 +143,14 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
             </div>
             <div className="mt-1 relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Link className="h-5 w-5 text-gray-400" />
+                <Link className="h-5 w-5 text-gray-500" />
               </div>
               <input
                 type="url"
                 id="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className={`block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors ${
+                className={`block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors placeholder:text-gray-500 ${
                   errors.url ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                 } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
                 placeholder="https://marketplace.dify.ai/plugins/langgenius/agent"
@@ -160,7 +160,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
             {errors.url && (
               <p className="mt-2 text-sm text-red-600">{errors.url}</p>
             )}
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-sm text-gray-500">
               Enter a Dify Marketplace plugin URL (e.g. https://marketplace.dify.ai/plugins/langgenius/agent) or direct .difypkg file URL
             </p>
           </div>
@@ -180,7 +180,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
               id="suffix"
               value={suffix}
               onChange={(e) => setSuffix(e.target.value)}
-              className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors ${
+              className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors placeholder:text-gray-500 ${
                 errors.suffix ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
               } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
               placeholder="offline"
@@ -189,7 +189,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
             {errors.suffix && (
               <p className="mt-2 text-sm text-red-600">{errors.suffix}</p>
             )}
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-sm text-gray-500">
               The suffix will be added to the output filename (e.g., plugin-offline.difypkg)
             </p>
           </div>
@@ -247,11 +247,11 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
               id="suffix"
               value={suffix}
               onChange={(e) => setSuffix(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors placeholder:text-gray-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               placeholder="offline"
               disabled={isLoading}
             />
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-sm text-gray-500">
               The suffix will be added to the output filename (e.g., plugin-offline.difypkg)
             </p>
           </div>

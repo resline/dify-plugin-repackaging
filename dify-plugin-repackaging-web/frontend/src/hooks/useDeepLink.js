@@ -17,12 +17,15 @@ export const useDeepLink = () => {
     const name = params.get('name');
     const version = params.get('version');
     
+    let hasData = false;
+    
     if (pluginUrl) {
       // Handle full plugin URL parameter
       setDeepLinkData({
         type: 'url',
         url: pluginUrl
       });
+      hasData = true;
     } else if (author && name) {
       // Handle individual plugin parameters
       setDeepLinkData({
@@ -31,10 +34,11 @@ export const useDeepLink = () => {
         name,
         version: version || 'latest'
       });
+      hasData = true;
     }
     
     // Clear URL parameters after processing to avoid confusion
-    if (deepLinkData) {
+    if (hasData) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);

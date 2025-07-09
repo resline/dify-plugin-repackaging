@@ -161,14 +161,14 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="flex-1 relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
+            <Search className="h-5 w-5 text-gray-500" />
           </div>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search plugins by name..."
-            className="block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            className="block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors placeholder:text-gray-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           />
         </div>
         <button
@@ -268,11 +268,11 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
         </div>
       ) : !error && plugins.length === 0 ? (
         <div className="text-center py-12 space-y-3">
-          <div className="mx-auto h-12 w-12 text-gray-400">
+          <div className="mx-auto h-12 w-12 text-gray-500">
             <Search className="h-full w-full" />
           </div>
-          <p className="text-gray-500 dark:text-gray-400">No plugins found</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500">Try adjusting your search criteria</p>
+          <p className="text-gray-500">No plugins found</p>
+          <p className="text-sm text-gray-500">Try adjusting your search criteria</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

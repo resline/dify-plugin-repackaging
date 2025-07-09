@@ -7,7 +7,7 @@ export interface WebSocketOptions {
   onOpen?: () => void;
   onMessage?: (data: any) => void;
   onError?: (error: Event) => void;
-  onClose?: () => void;
+  onClose?: (event?: CloseEvent) => void;
   autoReconnect?: boolean;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
@@ -105,12 +105,19 @@ export class ReconnectingWebSocket {
       }
     };
 
-    this.ws.onclose = () => {
-      console.log(`WebSocket closed for task ${this.taskId}`);
+    this.ws.onclose = (event) => {
+      console.log(`WebSocket closed for task ${this.taskId}. Code: ${event.code}, Reason: ${event.reason}`);
       this.stopHeartbeat();
       
+      // Check for specific close codes
+      if (event.code === 1008 && event.reason === 'Task not found') {
+        console.error(`Task ${this.taskId} not found. WebSocket connection rejected.`);
+        // Don't attempt to reconnect for non-existent tasks
+        this.isManualClose = true;
+      }
+      
       if (this.options.onClose) {
-        this.options.onClose();
+        this.options.onClose(event);
       }
       
       // Only attempt reconnect if not manually closed and auto-reconnect is enabled

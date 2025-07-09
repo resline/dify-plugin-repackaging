@@ -148,20 +148,28 @@ async def broadcast_marketplace_selection(plugin_metadata: dict):
 @router.websocket("/ws/tasks/{task_id}")
 async def websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time task updates"""
-    await manager.connect(websocket, task_id)
-    
-    # Create Redis subscription
+    # Create Redis client to check if task exists
     redis_client = await redis.from_url(settings.REDIS_URL, decode_responses=True)
-    pubsub = redis_client.pubsub()
     
     try:
+        # Validate that task exists before accepting connection
+        task_data = await redis_client.get(f"task:{task_id}")
+        if not task_data:
+            logger.warning(f"WebSocket connection attempted for non-existent task: {task_id}")
+            await websocket.close(code=1008, reason="Task not found")
+            return
+        
+        # Task exists, accept connection
+        await manager.connect(websocket, task_id)
+        
+        # Create pubsub subscription
+        pubsub = redis_client.pubsub()
+        
         # Subscribe to task updates
         await pubsub.subscribe(f"task_updates:{task_id}")
         
         # Send initial status
-        task_data = await redis_client.get(f"task:{task_id}")
-        if task_data:
-            await websocket.send_json(json.loads(task_data))
+        await websocket.send_json(json.loads(task_data))
         
         # Listen for updates
         async def listen_for_updates():
@@ -213,6 +221,9 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
     except Exception as e:
         logger.exception(f"WebSocket error for task {task_id}")
     finally:
-        await manager.disconnect(websocket, task_id)
-        await pubsub.unsubscribe()
+        # Only disconnect if connection was established
+        if task_data:
+            await manager.disconnect(websocket, task_id)
+            if 'pubsub' in locals():
+                await pubsub.unsubscribe()
         await redis_client.close()

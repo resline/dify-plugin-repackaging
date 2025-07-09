@@ -524,3 +524,62 @@ async def list_recent_tasks(limit: int = 10):
     tasks.sort(key=lambda x: x["created_at"], reverse=True)
     
     return {"tasks": tasks[:limit]}
+
+
+@router.get("/tasks/completed")
+async def list_completed_tasks(limit: int = Query(default=10, ge=1, le=100)):
+    """
+    List completed tasks with their download information
+    
+    This endpoint returns only tasks that have completed successfully and have
+    downloadable files available.
+    
+    Parameters:
+    - **limit**: Maximum number of tasks to return (1-100, default: 10)
+    
+    Returns:
+    - List of completed tasks with download URLs
+    """
+    try:
+        # Get all task keys from Redis
+        keys = redis_client.keys("task:*")
+        completed_tasks = []
+        
+        for key in keys:
+            task_data = redis_client.get(key)
+            if task_data:
+                task = json.loads(task_data)
+                
+                # Only include completed tasks
+                if task.get("status") == TaskStatus.COMPLETED.value and task.get("output_filename"):
+                    # Check if the output file still exists
+                    file_path = os.path.join(settings.TEMP_DIR, task["task_id"], task["output_filename"])
+                    if os.path.exists(file_path):
+                        completed_tasks.append({
+                            "task_id": task["task_id"],
+                            "status": task["status"],
+                            "created_at": task["created_at"],
+                            "completed_at": task.get("completed_at"),
+                            "original_filename": task.get("original_filename"),
+                            "output_filename": task.get("output_filename"),
+                            "plugin_info": task.get("plugin_info"),
+                            "download_url": f"{settings.API_V1_STR}/tasks/{task['task_id']}/download",
+                            "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else None
+                        })
+        
+        # Sort by completed_at (most recent first)
+        completed_tasks.sort(
+            key=lambda x: x.get("completed_at", x["created_at"]), 
+            reverse=True
+        )
+        
+        # Return limited results
+        return {
+            "tasks": completed_tasks[:limit],
+            "total": len(completed_tasks),
+            "limit": limit
+        }
+        
+    except Exception as e:
+        logger.exception("Error listing completed tasks")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

@@ -175,6 +175,73 @@ async def get_categories():
         )
 
 
+@router.get("/marketplace/plugins/featured")
+async def get_featured_plugins(
+    limit: int = Query(6, ge=1, le=20, description="Number of featured plugins to return")
+):
+    """
+    Get featured or recommended plugins from the marketplace
+    
+    This endpoint returns a curated list of popular or recommended plugins.
+    Currently returns the most popular plugins based on search results.
+    
+    Parameters:
+    - **limit**: Number of featured plugins to return (1-20, default: 6)
+    
+    Returns:
+    - Same format as the search endpoint but with featured plugins
+    """
+    try:
+        # For now, return popular/verified plugins
+        # In a real implementation, this could be a curated list
+        result = await MarketplaceService.search_plugins(
+            page=1,
+            per_page=limit
+        )
+        
+        # If we have plugins, filter for verified ones or popular categories
+        if result.get("plugins"):
+            plugins = result["plugins"]
+            
+            # Prioritize verified plugins or specific popular authors
+            popular_authors = ["langgenius", "dify", "community"]
+            featured_plugins = []
+            
+            # First add verified or popular author plugins
+            for plugin in plugins:
+                if (plugin.get("verified") or 
+                    plugin.get("author") in popular_authors or
+                    plugin.get("download_count", 0) > 100):
+                    featured_plugins.append(plugin)
+            
+            # If not enough, add the rest
+            for plugin in plugins:
+                if plugin not in featured_plugins and len(featured_plugins) < limit:
+                    featured_plugins.append(plugin)
+            
+            result["plugins"] = featured_plugins[:limit]
+            result["total"] = len(featured_plugins)
+            result["featured"] = True
+        
+        return JSONResponse(
+            content=result,
+            headers={"Content-Type": "application/json"}
+        )
+        
+    except Exception as e:
+        logger.exception("Error getting featured plugins")
+        # Fallback to regular search
+        try:
+            result = await MarketplaceService.search_plugins(page=1, per_page=limit)
+            result["featured"] = False
+            return JSONResponse(
+                content=result,
+                headers={"Content-Type": "application/json"}
+            )
+        except:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/marketplace/authors")
 async def get_authors():
     """Get list of unique plugin authors from marketplace"""

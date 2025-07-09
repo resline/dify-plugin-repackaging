@@ -9,6 +9,26 @@ const api = axios.create({
   },
 });
 
+// Add response interceptor for better error logging
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      // Log 404 errors specifically
+      if (error.response.status === 404) {
+        console.warn(`API endpoint not found: ${error.config?.method?.toUpperCase()} ${error.config?.url}`);
+      } else if (error.response.status >= 500) {
+        console.error(`Server error (${error.response.status}): ${error.config?.url}`, error.response.data);
+      }
+    } else if (error.request) {
+      console.error('Network error - no response received:', error.config?.url);
+    } else {
+      console.error('Request setup error:', error.message);
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const taskService = {
   createTask: async (url, platform = '', suffix = 'offline') => {
     const response = await api.post('/tasks', {
@@ -57,15 +77,13 @@ export const taskService = {
     const response = await api.get('/tasks', { params: { limit } });
     return response.data;
   },
-
-  listCompletedFiles: async (limit = 10) => {
-    const response = await api.get('/tasks/completed', { params: { limit } });
-    return response.data;
-  },
 };
 
 // Re-export marketplaceService from marketplace.js for backward compatibility
 export { marketplaceService } from './marketplace';
+
+// Import fileService from files.ts
+export { fileService } from './files';
 
 export const createWebSocket = (taskId) => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

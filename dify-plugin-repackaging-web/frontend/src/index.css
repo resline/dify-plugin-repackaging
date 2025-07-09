@@ -11,6 +11,33 @@
   body {
     @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
   }
+  
+  /* Global placeholder styles for better visibility */
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-gray-500 opacity-100;
+  }
+  
+  /* Ensure placeholder is visible in all browsers */
+  ::-webkit-input-placeholder {
+    @apply text-gray-500 opacity-100;
+  }
+  
+  ::-moz-placeholder {
+    @apply text-gray-500 opacity-100;
+  }
+  
+  :-ms-input-placeholder {
+    @apply text-gray-500 opacity-100;
+  }
+  
+  ::-ms-input-placeholder {
+    @apply text-gray-500 opacity-100;
+  }
+  
+  ::placeholder {
+    @apply text-gray-500 opacity-100;
+  }
 }
 
 /* Custom utilities */

@@ -22,19 +22,32 @@ const handleApiError = (error: unknown): never => {
         `API request failed (${axiosError.response.status})`;
       
       // Add more context for specific status codes
-      if (axiosError.response.status === 502) {
+      if (axiosError.response.status === 404) {
+        console.warn(`API endpoint not found: ${axiosError.config?.method?.toUpperCase()} ${axiosError.config?.url}`);
+        throw new Error(`Requested resource not found (404): ${axiosError.config?.url}`);
+      } else if (axiosError.response.status === 502) {
         throw new Error('Marketplace service is temporarily unavailable. Please try again later.');
       } else if (axiosError.response.status === 503) {
         throw new Error('Service overloaded. Please wait a moment and try again.');
       }
       
+      // Log error details for debugging
+      console.error('API Error:', {
+        status: axiosError.response.status,
+        url: axiosError.config?.url,
+        method: axiosError.config?.method,
+        data: axiosError.response.data
+      });
+      
       throw new Error(errorMessage);
     } else if (axiosError.request) {
       // Request was made but no response
+      console.error('Network Error - No response received:', axiosError.config?.url);
       throw new Error('Cannot connect to the service. Please check your connection.');
     }
   }
   // Something else happened
+  console.error('Unexpected error:', error);
   throw new Error(error instanceof Error ? error.message : 'An unexpected error occurred');
 };
 
