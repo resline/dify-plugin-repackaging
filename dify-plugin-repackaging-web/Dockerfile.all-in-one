@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y \
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend/ ./
+COPY backend/ ./backend/
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
@@ -62,20 +62,13 @@ logfile_backups=10\n\
 loglevel=info\n\
 pidfile=/var/run/supervisord.pid\n\
 \n\
-[program:redis]\n\
-command=redis-server /etc/redis/redis.conf\n\
-autostart=true\n\
-autorestart=true\n\
-priority=1\n\
-stdout_logfile=/var/log/redis.log\n\
-stderr_logfile=/var/log/redis.err\n\
 \n\
 [program:backend]\n\
 command=uvicorn app.main:app --host 0.0.0.0 --port 8000 --limit-max-requests 1000 --limit-concurrency 1000\n\
-directory=/app\n\
+directory=/app/backend\n\
 autostart=true\n\
 autorestart=true\n\
-environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\",MAX_UPLOAD_SIZE=\"104857600\"\n\
+environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\",MAX_UPLOAD_SIZE=\"104857600\",PYTHONPATH=\"/app/backend\"\n\
 startsecs=10\n\
 stopwaitsecs=60\n\
 stdout_logfile=/var/log/backend.log\n\
@@ -87,11 +80,11 @@ stderr_logfile_backups=3\n\
 \n\
 [program:worker]\n\
 command=celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=100\n\
-directory=/app\n\
+directory=/app/backend\n\
 autostart=true\n\
 autorestart=unexpected\n\
 exitcodes=0\n\
-environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\"\n\
+environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\",PYTHONPATH=\"/app/backend\"\n\
 startsecs=10\n\
 stopwaitsecs=600\n\
 stopasgroup=true\n\
@@ -105,10 +98,10 @@ stderr_logfile_backups=3\n\
 \n\
 [program:celery-beat]\n\
 command=celery -A app.workers.celery_app beat --loglevel=info\n\
-directory=/app\n\
+directory=/app/backend\n\
 autostart=true\n\
 autorestart=true\n\
-environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\"\n\
+environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\",PYTHONPATH=\"/app/backend\"\n\
 startsecs=10\n\
 stopwaitsecs=60\n\
 stdout_logfile=/var/log/celery-beat.log\n\
@@ -259,7 +252,7 @@ http {\n\
 ENV REDIS_URL="redis://localhost:6379/0"
 ENV CELERY_BROKER_URL="redis://localhost:6379/0"
 ENV CELERY_RESULT_BACKEND="redis://localhost:6379/0"
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/backend
 
 EXPOSE 80
 
