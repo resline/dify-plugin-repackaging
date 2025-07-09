@@ -168,20 +168,20 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search plugins by name..."
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           />
         </div>
         <button
           type="submit"
           disabled={loading}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Search
         </button>
         <button
           type="button"
           onClick={() => setShowFilters(!showFilters)}
-          className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
         >
           <Filter className="h-5 w-5 text-gray-600" />
         </button>
@@ -189,17 +189,17 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
 
       {/* Filters */}
       {showFilters && (
-        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Category filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Category
               </label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 <option value="">All Categories</option>
                 {Array.isArray(categories) && categories.map((cat) => (
@@ -212,13 +212,13 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
 
             {/* Author filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Author
               </label>
               <select
                 value={selectedAuthor}
                 onChange={(e) => setSelectedAuthor(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 <option value="">All Authors</option>
                 {Array.isArray(authors) && authors.map((author) => (
@@ -234,7 +234,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
           {(selectedCategory || selectedAuthor || searchQuery) && (
             <button
               onClick={clearFilters}
-              className="text-sm text-indigo-600 hover:text-indigo-500"
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
             >
               Clear all filters
             </button>
@@ -271,8 +271,8 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
           <div className="mx-auto h-12 w-12 text-gray-400">
             <Search className="h-full w-full" />
           </div>
-          <p className="text-gray-500">No plugins found</p>
-          <p className="text-sm text-gray-400">Try adjusting your search criteria</p>
+          <p className="text-gray-500 dark:text-gray-400">No plugins found</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">Try adjusting your search criteria</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -294,7 +294,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1 || loading}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Previous
           </button>
@@ -318,11 +318,11 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
                   key={i}
                   onClick={() => setPage(pageNum)}
                   disabled={loading}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     pageNum === page
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                  } disabled:cursor-not-allowed`}
+                      ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                      : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  } disabled:cursor-not-allowed transition-colors`}
                 >
                   {pageNum}
                 </button>
@@ -333,7 +333,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
           <button
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages || loading}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Next
           </button>

@@ -20,4 +20,4 @@ export interface PluginMetadata {
   description?: string;
 }
 
-export type TabId = 'url' | 'marketplace' | 'file';
+export type TabId = 'url' | 'marketplace' | 'file' | 'completed';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Link, Store, File, ChevronLeft, Plus, Command } from 'lucide-react';
+import { Package, Link, Store, File, ChevronLeft, Plus, Command, FolderOpen } from 'lucide-react';
 
 const Layout = ({ 
   children, 
@@ -27,6 +27,9 @@ const Layout = ({
         case '3':
           onTabChange('file');
           break;
+        case '4':
+          onTabChange('completed');
+          break;
         case 'n':
         case 'N':
           if (e.ctrlKey || e.metaKey) {
@@ -44,7 +47,8 @@ const Layout = ({
   const tabs = [
     { id: 'url', label: 'Direct URL', icon: Link, shortcut: '1' },
     { id: 'marketplace', label: 'Browse Marketplace', icon: Store, shortcut: '2' },
-    { id: 'file', label: 'Upload File', icon: File, shortcut: '3' }
+    { id: 'file', label: 'Upload File', icon: File, shortcut: '3' },
+    { id: 'completed', label: 'Completed Files', icon: FolderOpen, shortcut: '4' }
   ];
 
   return (
@@ -152,6 +156,10 @@ const Layout = ({
               <div className="flex justify-between">
                 <span className="text-gray-600">Switch to Upload File</span>
                 <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">3</kbd>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Switch to Completed Files</span>
+                <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">4</kbd>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">New Task</span>

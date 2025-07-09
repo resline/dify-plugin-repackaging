@@ -131,46 +131,126 @@ http {\n\
     keepalive_timeout 1800s;\n\
     send_timeout 1800s;\n\
     \n\
+    # Map to handle WebSocket upgrade\n\
+    map $http_upgrade $connection_upgrade {\n\
+        default upgrade;\n\
+        "" close;\n\
+    }\n\
+    \n\
+    # Upstream backend server\n\
+    upstream backend {\n\
+        server localhost:8000;\n\
+        keepalive 64;\n\
+    }\n\
+    \n\
     server {\n\
         listen 80;\n\
         server_name localhost;\n\
         \n\
         client_max_body_size 500M;\n\
+        client_body_timeout 1800s;\n\
+        client_header_timeout 1800s;\n\
+        \n\
+        # Security headers\n\
+        add_header X-Frame-Options "SAMEORIGIN" always;\n\
+        add_header X-Content-Type-Options "nosniff" always;\n\
+        add_header X-XSS-Protection "1; mode=block" always;\n\
         \n\
         location / {\n\
             root /usr/share/nginx/html;\n\
             try_files $uri /index.html;\n\
+            add_header Cache-Control "no-cache, no-store, must-revalidate";\n\
         }\n\
         \n\
         location /api {\n\
-            proxy_pass http://localhost:8000;\n\
+            proxy_pass http://backend;\n\
             proxy_http_version 1.1;\n\
+            \n\
+            # Headers for regular HTTP requests\n\
             proxy_set_header Host $host;\n\
             proxy_set_header X-Real-IP $remote_addr;\n\
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
             proxy_set_header X-Forwarded-Proto $scheme;\n\
+            proxy_set_header X-Forwarded-Host $host;\n\
+            proxy_set_header X-Forwarded-Port $server_port;\n\
+            \n\
+            # Connection handling\n\
+            proxy_set_header Connection "";\n\
+            \n\
+            # Timeouts\n\
             proxy_connect_timeout 1800s;\n\
             proxy_send_timeout 1800s;\n\
             proxy_read_timeout 1800s;\n\
+            \n\
+            # Disable buffering for better streaming\n\
             proxy_request_buffering off;\n\
             proxy_buffering off;\n\
         }\n\
         \n\
-        location /ws {\n\
-            proxy_pass http://localhost:8000;\n\
+        # WebSocket location with exact match for better performance\n\
+        location ~ ^/ws/tasks/(.*)$ {\n\
+            proxy_pass http://backend/ws/tasks/$1;\n\
             proxy_http_version 1.1;\n\
+            \n\
+            # WebSocket specific headers\n\
             proxy_set_header Upgrade $http_upgrade;\n\
-            proxy_set_header Connection "upgrade";\n\
+            proxy_set_header Connection $connection_upgrade;\n\
+            \n\
+            # Standard headers\n\
             proxy_set_header Host $host;\n\
             proxy_set_header X-Real-IP $remote_addr;\n\
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
             proxy_set_header X-Forwarded-Proto $scheme;\n\
+            proxy_set_header X-Forwarded-Host $host;\n\
+            proxy_set_header X-Forwarded-Port $server_port;\n\
+            \n\
+            # WebSocket timeouts (much longer for persistent connections)\n\
+            proxy_connect_timeout 7d;\n\
+            proxy_send_timeout 7d;\n\
+            proxy_read_timeout 7d;\n\
+            \n\
+            # Disable buffering for WebSocket\n\
+            proxy_buffering off;\n\
+            proxy_request_buffering off;\n\
+            \n\
+            # Handle large frames\n\
+            proxy_buffer_size 64k;\n\
+            proxy_buffers 8 64k;\n\
+            proxy_busy_buffers_size 128k;\n\
+        }\n\
+        \n\
+        # General /ws location for other WebSocket endpoints\n\
+        location /ws {\n\
+            proxy_pass http://backend;\n\
+            proxy_http_version 1.1;\n\
+            \n\
+            # WebSocket specific headers\n\
+            proxy_set_header Upgrade $http_upgrade;\n\
+            proxy_set_header Connection $connection_upgrade;\n\
+            \n\
+            # Standard headers\n\
+            proxy_set_header Host $host;\n\
+            proxy_set_header X-Real-IP $remote_addr;\n\
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+            proxy_set_header X-Forwarded-Proto $scheme;\n\
+            proxy_set_header X-Forwarded-Host $host;\n\
+            proxy_set_header X-Forwarded-Port $server_port;\n\
+            \n\
+            # WebSocket timeouts\n\
+            proxy_connect_timeout 7d;\n\
+            proxy_send_timeout 7d;\n\
+            proxy_read_timeout 7d;\n\
+            \n\
+            # Disable buffering\n\
+            proxy_buffering off;\n\
+            proxy_request_buffering off;\n\
         }\n\
         \n\
         location /health {\n\
-            proxy_pass http://localhost:8000/health;\n\
+            proxy_pass http://backend/health;\n\
             proxy_http_version 1.1;\n\
             proxy_set_header Host $host;\n\
+            proxy_set_header Connection "";\n\
         }\n\
     }\n\
 }' > /etc/nginx/nginx.conf

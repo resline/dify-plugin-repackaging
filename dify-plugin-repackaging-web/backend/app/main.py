@@ -2,9 +2,11 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from app.core.config import settings
+from app.core.middleware import JSONResponseMiddleware, ErrorHandlingMiddleware, RequestValidationMiddleware
 from app.api import websocket
 from app.api.v1.endpoints import marketplace as v1_marketplace
 from app.api.v1.endpoints import tasks as v1_tasks
+from app.api.v1.endpoints import files as v1_files
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -41,7 +43,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Add SlowAPI middleware
 app.add_middleware(SlowAPIMiddleware)
 
-# Set up CORS
+# Add custom middleware for JSON responses and error handling
+app.add_middleware(JSONResponseMiddleware)
+app.add_middleware(ErrorHandlingMiddleware)
+app.add_middleware(RequestValidationMiddleware)
+
+# Set up CORS - should be added last to work properly
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -56,6 +63,7 @@ app.include_router(websocket.router)
 # V1 endpoints
 app.include_router(v1_marketplace.router, prefix=settings.API_V1_STR)
 app.include_router(v1_tasks.router, prefix=settings.API_V1_STR)
+app.include_router(v1_files.router, prefix=settings.API_V1_STR)
 
 # Create necessary directories
 os.makedirs(settings.TEMP_DIR, exist_ok=True)

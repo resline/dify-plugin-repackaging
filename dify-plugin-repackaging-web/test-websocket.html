@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+        #messages {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: #f0f0f0;
+            border-radius: 3px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    
+    <div>
+        <label>Task ID: <input type="text" id="taskId" value="test-task-123" /></label>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="sendPing()">Send Ping</button>
+    </div>
+    
+    <div id="status" class="disconnected">Disconnected</div>
+    
+    <div id="messages"></div>
+    
+    <script>
+        let ws = null;
+        let messageCount = 0;
+        
+        function log(message, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.textContent = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            messageCount++;
+            
+            // Keep only last 100 messages
+            if (messageCount > 100) {
+                messagesDiv.removeChild(messagesDiv.firstChild);
+                messageCount--;
+            }
+        }
+        
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.className = 'connected';
+                statusDiv.textContent = 'Connected';
+            } else {
+                statusDiv.className = 'disconnected';
+                statusDiv.textContent = 'Disconnected';
+            }
+        }
+        
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected', 'warning');
+                return;
+            }
+            
+            const taskId = document.getElementById('taskId').value;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const wsUrl = `${protocol}//${host}/ws/tasks/${taskId}`;
+            
+            log(`Connecting to ${wsUrl}...`, 'info');
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function() {
+                    log('WebSocket connected successfully', 'success');
+                    updateStatus(true);
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`Received: ${JSON.stringify(data, null, 2)}`, 'message');
+                        
+                        // Handle ping messages
+                        if (data.type === 'ping') {
+                            log('Received ping, sending pong...', 'info');
+                            ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                        }
+                    } catch (e) {
+                        log(`Received non-JSON message: ${event.data}`, 'message');
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    log(`WebSocket error: ${error}`, 'error');
+                    console.error('WebSocket error:', error);
+                };
+                
+                ws.onclose = function(event) {
+                    log(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`, 'info');
+                    updateStatus(false);
+                    ws = null;
+                };
+                
+            } catch (error) {
+                log(`Failed to create WebSocket: ${error}`, 'error');
+            }
+        }
+        
+        function disconnect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Closing WebSocket connection...', 'info');
+                ws.close();
+            } else {
+                log('WebSocket is not connected', 'warning');
+            }
+        }
+        
+        function sendPing() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const message = { type: 'ping', timestamp: Date.now() };
+                log(`Sending: ${JSON.stringify(message)}`, 'send');
+                ws.send(JSON.stringify(message));
+            } else {
+                log('WebSocket is not connected', 'warning');
+            }
+        }
+        
+        // Log initial info
+        log(`Current URL: ${window.location.href}`, 'info');
+        log(`Protocol: ${window.location.protocol}`, 'info');
+        log(`Host: ${window.location.host}`, 'info');
+    </script>
+</body>
+</html>

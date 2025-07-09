@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
+from fastapi.responses import JSONResponse
+from typing import Optional, List, Dict, Any
 from app.services.marketplace import MarketplaceService
 from app.utils.circuit_breaker import marketplace_circuit_breaker
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +76,11 @@ async def search_plugins(
         if "error" in result:
             logger.warning(f"Marketplace search returned error: {result['error']}")
             
-        return result
+        # Ensure response is JSON with proper content type
+        return JSONResponse(
+            content=result,
+            headers={"Content-Type": "application/json"}
+        )
         
     except Exception as e:
         logger.exception("Error searching marketplace")
@@ -101,7 +107,11 @@ async def get_plugin_details(author: str, name: str):
                 detail=f"Plugin {author}/{name} not found"
             )
         
-        return plugin
+        # Return as JSON response
+        return JSONResponse(
+            content=plugin,
+            headers={"Content-Type": "application/json"}
+        )
         
     except HTTPException:
         raise
@@ -129,7 +139,10 @@ async def get_plugin_versions(author: str, name: str):
                 detail=f"No versions found for plugin {author}/{name}"
             )
         
-        return {"versions": versions}
+        return JSONResponse(
+            content={"versions": versions},
+            headers={"Content-Type": "application/json"}
+        )
         
     except HTTPException:
         raise
@@ -148,12 +161,18 @@ async def get_categories():
         if not isinstance(categories, list):
             categories = ["agent", "tool", "model", "extension", "workflow"]
         
-        return {"categories": categories}
+        return JSONResponse(
+            content={"categories": categories},
+            headers={"Content-Type": "application/json"}
+        )
         
     except Exception as e:
         logger.exception("Error getting categories")
         # Return default categories instead of error
-        return {"categories": ["agent", "tool", "model", "extension", "workflow"]}
+        return JSONResponse(
+            content={"categories": ["agent", "tool", "model", "extension", "workflow"]},
+            headers={"Content-Type": "application/json"}
+        )
 
 
 @router.get("/marketplace/authors")
@@ -167,7 +186,10 @@ async def get_authors():
         cache_key = "marketplace:authors_list"
         cached_authors = redis_client.get(cache_key)
         if cached_authors:
-            return json.loads(cached_authors)
+            return JSONResponse(
+                content=json.loads(cached_authors),
+                headers={"Content-Type": "application/json"}
+            )
         
         # Get first page of plugins with max results to extract authors
         result = await MarketplaceService.search_plugins(page=1, per_page=100)
@@ -192,12 +214,18 @@ async def get_authors():
         # Cache the result for 1 hour
         redis_client.setex(cache_key, 3600, json.dumps(response))
         
-        return response
+        return JSONResponse(
+            content=response,
+            headers={"Content-Type": "application/json"}
+        )
         
     except Exception as e:
         logger.exception("Error getting authors")
         # Return some default authors instead of empty list
-        return {"authors": ['langgenius', 'dify', 'community']}
+        return JSONResponse(
+            content={"authors": ['langgenius', 'dify', 'community']},
+            headers={"Content-Type": "application/json"}
+        )
 
 
 @router.post("/marketplace/plugins/{author}/{name}/{version}/download-url")
@@ -211,14 +239,17 @@ async def get_download_url(author: str, name: str, version: str):
     try:
         download_url = MarketplaceService.construct_download_url(author, name, version)
         
-        return {
-            "download_url": download_url,
-            "plugin": {
-                "author": author,
-                "name": name,
-                "version": version
-            }
-        }
+        return JSONResponse(
+            content={
+                "download_url": download_url,
+                "plugin": {
+                    "author": author,
+                    "name": name,
+                    "version": version
+                }
+            },
+            headers={"Content-Type": "application/json"}
+        )
         
     except Exception as e:
         logger.exception(f"Error building download URL for {author}/{name}/{version}")
@@ -248,26 +279,35 @@ async def parse_marketplace_url(
             # Try to get the latest version
             latest_version = await MarketplaceService.get_latest_version(author, name)
             
-            return {
-                "valid": True,
-                "author": author,
-                "name": name,
-                "latest_version": latest_version,
-                "download_url": MarketplaceService.construct_download_url(author, name, latest_version) if latest_version else None
-            }
+            return JSONResponse(
+                content={
+                    "valid": True,
+                    "author": author,
+                    "name": name,
+                    "latest_version": latest_version,
+                    "download_url": MarketplaceService.construct_download_url(author, name, latest_version) if latest_version else None
+                },
+                headers={"Content-Type": "application/json"}
+            )
         else:
-            return {
-                "valid": False,
-                "error": "Not a valid marketplace plugin URL",
-                "expected_format": "https://marketplace.dify.ai/plugins/{author}/{name}"
-            }
+            return JSONResponse(
+                content={
+                    "valid": False,
+                    "error": "Not a valid marketplace plugin URL",
+                    "expected_format": "https://marketplace.dify.ai/plugins/{author}/{name}"
+                },
+                headers={"Content-Type": "application/json"}
+            )
             
     except Exception as e:
         logger.exception(f"Error parsing marketplace URL: {url}")
-        return {
-            "valid": False,
-            "error": str(e)
-        }
+        return JSONResponse(
+            content={
+                "valid": False,
+                "error": str(e)
+            },
+            headers={"Content-Type": "application/json"}
+        )
 
 
 @router.get("/marketplace/status")
@@ -295,17 +335,20 @@ async def get_marketplace_status():
             api_status = "error"
             api_error = str(e)
         
-        return {
-            "marketplace_api": {
-                "status": api_status,
-                "error": api_error
+        return JSONResponse(
+            content={
+                "marketplace_api": {
+                    "status": api_status,
+                    "error": api_error
+                },
+                "circuit_breaker": circuit_state,
+                "recommendations": {
+                    "circuit_open": "Wait for automatic recovery or manually reset",
+                    "api_error": "Check marketplace URL and network connectivity"
+                } if circuit_state["state"] == "open" or api_status == "error" else None
             },
-            "circuit_breaker": circuit_state,
-            "recommendations": {
-                "circuit_open": "Wait for automatic recovery or manually reset",
-                "api_error": "Check marketplace URL and network connectivity"
-            } if circuit_state["state"] == "open" or api_status == "error" else None
-        }
+            headers={"Content-Type": "application/json"}
+        )
         
     except Exception as e:
         logger.exception("Error checking marketplace status")
@@ -318,12 +361,73 @@ async def reset_circuit_breaker():
     try:
         marketplace_circuit_breaker.reset()
         
-        return {
-            "status": "success",
-            "message": "Circuit breaker has been reset",
-            "circuit_state": marketplace_circuit_breaker.get_state()
-        }
+        return JSONResponse(
+            content={
+                "status": "success",
+                "message": "Circuit breaker has been reset",
+                "circuit_state": marketplace_circuit_breaker.get_state()
+            },
+            headers={"Content-Type": "application/json"}
+        )
         
     except Exception as e:
         logger.exception("Error resetting circuit breaker")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/marketplace/debug")
+async def debug_marketplace():
+    """Debug endpoint to test marketplace connectivity and responses"""
+    debug_info = {
+        "circuit_breaker": marketplace_circuit_breaker.get_state(),
+        "tests": {}
+    }
+    
+    # Test 1: Direct API call
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                "https://marketplace.dify.ai/api/v1/categories",
+                headers={"Accept": "application/json"}
+            )
+            debug_info["tests"]["direct_api_call"] = {
+                "status": response.status_code,
+                "content_type": response.headers.get("content-type", "Not set"),
+                "is_json": "application/json" in response.headers.get("content-type", ""),
+                "response_preview": response.text[:200] if response.text else "Empty"
+            }
+    except Exception as e:
+        debug_info["tests"]["direct_api_call"] = {
+            "error": str(e),
+            "type": type(e).__name__
+        }
+    
+    # Test 2: Service method
+    try:
+        result = await MarketplaceService.search_plugins(page=1, per_page=1)
+        debug_info["tests"]["service_search"] = {
+            "success": True,
+            "has_plugins": bool(result.get("plugins")),
+            "plugin_count": len(result.get("plugins", [])),
+            "has_error": "error" in result,
+            "fallback_used": result.get("fallback_used", False)
+        }
+    except Exception as e:
+        debug_info["tests"]["service_search"] = {
+            "success": False,
+            "error": str(e),
+            "type": type(e).__name__
+        }
+    
+    # Test 3: Check fallback
+    try:
+        from app.services.marketplace_scraper import marketplace_fallback_service
+        debug_info["tests"]["fallback_available"] = True
+    except:
+        debug_info["tests"]["fallback_available"] = False
+    
+    return JSONResponse(
+        content=debug_info,
+        headers={"Content-Type": "application/json"}
+    )

@@ -60,7 +60,20 @@ class DownloadService:
         # Extract filename from URL
         parsed = urlparse(url)
         filename = os.path.basename(parsed.path)
-        if not filename.endswith('.difypkg'):
+        
+        # For marketplace download URLs, construct filename from the path
+        if "marketplace.dify.ai" in parsed.netloc and "/download" in parsed.path:
+            # Extract author, name, version from path like /api/v1/plugins/author/name/version/download
+            path_parts = parsed.path.strip('/').split('/')
+            if len(path_parts) >= 5:
+                author = path_parts[3]
+                name = path_parts[4]
+                version = path_parts[5]
+                filename = f"{author}_{name}_{version}.difypkg"
+            else:
+                # Fallback to generic filename
+                filename = "plugin.difypkg"
+        elif not filename.endswith('.difypkg'):
             raise ValueError("URL must point to a .difypkg file")
         
         # Check file size before downloading
@@ -92,7 +105,12 @@ class DownloadService:
                 
                 async with get_async_client(timeout=custom_timeout) as client:
                     # Stream the download for better memory usage
+                    logger.info(f"Starting download with streaming from {url}")
                     async with client.stream('GET', url, follow_redirects=True) as response:
+                        # Log response status and headers
+                        logger.info(f"Response status: {response.status_code}")
+                        logger.debug(f"Response headers: {dict(response.headers)}")
+                        
                         response.raise_for_status()
                         
                         # Check file size from response headers if not already known
@@ -102,9 +120,17 @@ class DownloadService:
                                 raise ValueError(f"File too large. Maximum size: {settings.MAX_FILE_SIZE} bytes")
                         
                         # Save file in chunks
+                        downloaded_bytes = 0
                         async with aiofiles.open(file_path, 'wb') as f:
                             async for chunk in response.aiter_bytes(chunk_size=8192):
                                 await f.write(chunk)
+                                downloaded_bytes += len(chunk)
+                                
+                                # Log progress every 1MB
+                                if downloaded_bytes % (1024 * 1024) == 0:
+                                    logger.debug(f"Downloaded {downloaded_bytes / (1024 * 1024):.1f} MB")
+                        
+                        logger.info(f"Download complete: {downloaded_bytes} bytes saved to {file_path}")
                 
                 logger.info(f"Successfully downloaded file to {file_path}")
                 return file_path, filename

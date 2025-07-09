@@ -247,33 +247,24 @@ def process_marketplace_repackaging(self, task_id: str, author: str, name: str,
 @celery_app.task
 def cleanup_old_files():
     """Periodic task to clean up old files"""
-    import shutil
-    from datetime import datetime, timedelta
+    from app.services.file_manager import FileManager
     
-    cutoff_time = datetime.utcnow() - timedelta(hours=settings.FILE_RETENTION_HOURS)
-    
-    temp_dir = settings.TEMP_DIR
-    if not os.path.exists(temp_dir):
-        return
-    
-    cleaned = 0
-    for task_dir in os.listdir(temp_dir):
-        dir_path = os.path.join(temp_dir, task_dir)
-        if os.path.isdir(dir_path):
-            # Check directory modification time
-            mtime = datetime.fromtimestamp(os.path.getmtime(dir_path))
-            if mtime < cutoff_time:
-                shutil.rmtree(dir_path)
-                cleaned += 1
-                logger.info(f"Cleaned up old task directory: {task_dir}")
-    
-    return f"Cleaned {cleaned} old task directories"
+    try:
+        # Use FileManager for cleanup (respects 7-day retention)
+        cleaned_count = FileManager.cleanup_old_files()
+        
+        logger.info(f"Periodic cleanup completed: {cleaned_count} files removed")
+        return f"Cleaned {cleaned_count} old task directories"
+        
+    except Exception as e:
+        logger.error(f"Error in periodic cleanup: {e}")
+        return f"Cleanup failed: {str(e)}"
 
 
 # Configure periodic tasks
 celery_app.conf.beat_schedule = {
     'cleanup-old-files': {
         'task': 'app.workers.celery_app.cleanup_old_files',
-        'schedule': 3600.0,  # Run every hour
+        'schedule': 86400.0,  # Run every 24 hours (daily)
     },
 }

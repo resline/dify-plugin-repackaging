@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     TEMP_DIR: str = "/app/temp"
     SCRIPTS_DIR: str = "/app/scripts"
     FILE_RETENTION_HOURS: int = 24
+    FILE_RETENTION_DAYS: int = 7  # Retention period for completed files
     
     # Security
     RATE_LIMIT_PER_MINUTE: int = 30

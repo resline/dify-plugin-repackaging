@@ -20,13 +20,40 @@ class MarketplaceService:
     async def _make_api_request(client: httpx.AsyncClient, method: str, url: str, **kwargs):
         """Make an API request with circuit breaker protection"""
         async def _request():
+            # Ensure headers include Accept: application/json
+            headers = kwargs.get("headers", {})
+            headers["Accept"] = "application/json"
+            kwargs["headers"] = headers
+            
             if method.upper() == "GET":
                 response = await client.get(url, **kwargs)
             elif method.upper() == "POST":
                 response = await client.post(url, **kwargs)
             else:
                 raise ValueError(f"Unsupported method: {method}")
+            
+            # Log response details for debugging
+            logger.debug(f"Response from {url}: status={response.status_code}, headers={dict(response.headers)}")
+            
             response.raise_for_status()
+            
+            # Validate response content type
+            content_type = response.headers.get("content-type", "")
+            if "application/json" not in content_type.lower() and response.content:
+                logger.warning(f"Non-JSON response from {url}: {content_type}")
+                
+                # Check if it's HTML (common error page)
+                if "text/html" in content_type.lower():
+                    logger.error(f"Received HTML response from {url} - likely an error page or API change")
+                    raise ValueError(f"API returned HTML instead of JSON - API may have changed")
+                
+                # Try to parse anyway
+                try:
+                    response.json()
+                except Exception:
+                    logger.error(f"Response preview: {response.text[:200]}...")
+                    raise ValueError(f"Invalid response format from {url}: expected JSON, got {content_type}")
+            
             return response
         
         return await marketplace_circuit_breaker.async_call(_request)
@@ -104,103 +131,103 @@ class MarketplaceService:
             params["category"] = category
         
         try:
-            # Try the new API endpoint first
-            marketplace_api_url = "https://marketplace.dify.ai"
-            
-            # Build request body for the new API
-            request_body = {
-                "page": page,
-                "page_size": per_page,
-                "query": query or "",
-                "sort_by": "install_count",
-                "sort_order": "DESC",
-                "category": category or "",
-                "tags": [],
-                "type": "plugin"
-            }
-            
-            # Add author filter if provided
-            if author:
-                request_body["author"] = author
-            
-            # Make API request to the new endpoint
-            async with get_async_client() as client:
-                logger.info(f"Making marketplace API request to: {marketplace_api_url}/api/v1/plugins/search/advanced")
-                try:
-                    # Try the new search endpoint with circuit breaker
-                    response = await MarketplaceService._make_api_request(
-                        client,
-                        "POST",
-                        f"{marketplace_api_url}/api/v1/plugins/search/advanced",
-                        json=request_body,
-                        headers={"Content-Type": "application/json"}
-                    )
-                    
-                    result = response.json()
-                    
-                    # Transform the response to match our expected format
-                    transformed_result = {
-                        "plugins": result.get("data", []),
-                        "total": result.get("total", 0),
+            # Try multiple API endpoints in order
+            api_attempts = [
+                {
+                    "url": "https://marketplace.dify.ai/api/v1/plugins",
+                    "method": "GET",
+                    "params": params,
+                    "transformer": lambda r: {
+                        "plugins": r.get("data", r.get("plugins", [])),
+                        "total": r.get("total", len(r.get("data", r.get("plugins", [])))),
                         "page": page,
                         "per_page": per_page
                     }
-                    
-                    # Cache the result
-                    MarketplaceService._set_cache(cache_key, transformed_result)
-                    
-                    return transformed_result
-                    
-                except (httpx.HTTPError, CircuitOpenError) as e:
-                    # API is not working - try web scraping fallback
-                    if isinstance(e, CircuitOpenError):
-                        logger.warning("Circuit breaker is open, falling back to web scraper.")
-                    else:
-                        logger.warning("Dify Marketplace API has been updated, falling back to web scraper.")
-                    try:
-                        from app.services.marketplace_scraper import marketplace_fallback_service
-                        scraped_result = await marketplace_fallback_service.scraper.scrape_plugin_list(
-                            page=page, per_page=per_page, category=category, query=query
-                        )
-                        
-                        # Add API status info
-                        scraped_result["api_status"] = "incompatible"
-                        scraped_result["fallback_used"] = True
-                        scraped_result["fallback_reason"] = "API endpoints changed"
-                        
-                        # Cache the scraped result
-                        MarketplaceService._set_cache(cache_key, scraped_result)
-                        
-                        return scraped_result
-                        
-                    except Exception as scrape_error:
-                        logger.error(f"Web scraping also failed: {scrape_error}")
-                        return {
-                            "plugins": [],
-                            "total": 0,
-                            "page": page,
-                            "per_page": per_page,
-                            "error": "Dify Marketplace API has changed and web scraping failed.",
-                            "api_status": "incompatible"
-                        }
-                
-        except httpx.HTTPError as e:
-            logger.error(f"Error searching marketplace: {e}")
-            logger.warning(f"Both new and old Marketplace API endpoints failed.")
-            logger.warning("New API: https://marketplace-plugin.dify.dev/api/v1/plugins/search/advanced")
-            logger.warning(f"Old API: {settings.MARKETPLACE_API_URL}/api/v1/plugins")
+                },
+                {
+                    "url": "https://marketplace-plugin.dify.dev/api/v1/plugins",
+                    "method": "GET", 
+                    "params": params,
+                    "transformer": lambda r: {
+                        "plugins": r.get("data", r.get("plugins", [])),
+                        "total": r.get("total", len(r.get("data", r.get("plugins", [])))),
+                        "page": page,
+                        "per_page": per_page
+                    }
+                }
+            ]
             
-            # Try web scraping as last resort
+            # Try each API endpoint
+            async with get_async_client() as client:
+                last_error = None
+                
+                for attempt in api_attempts:
+                    try:
+                        logger.info(f"Trying marketplace API: {attempt['url']}")
+                        
+                        if attempt["method"] == "GET":
+                            response = await MarketplaceService._make_api_request(
+                                client,
+                                "GET",
+                                attempt["url"],
+                                params=attempt["params"]
+                            )
+                        else:
+                            response = await MarketplaceService._make_api_request(
+                                client,
+                                "POST",
+                                attempt["url"],
+                                json=attempt.get("json", {}),
+                                headers={
+                                    "Content-Type": "application/json",
+                                    "Accept": "application/json"
+                                }
+                            )
+                        
+                        # Parse response
+                        try:
+                            result = response.json()
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Failed to parse JSON from {attempt['url']}: {e}")
+                            continue
+                        
+                        # Transform and return result
+                        transformed_result = attempt["transformer"](result)
+                        
+                        # Add success metadata
+                        transformed_result["api_endpoint"] = attempt["url"]
+                        transformed_result["has_more"] = transformed_result["total"] > (page * per_page)
+                        
+                        # Cache the result
+                        MarketplaceService._set_cache(cache_key, transformed_result)
+                        
+                        return transformed_result
+                        
+                    except (httpx.HTTPError, CircuitOpenError, ValueError) as e:
+                        last_error = e
+                        logger.warning(f"API attempt failed for {attempt['url']}: {e}")
+                        continue
+                
+                # All API attempts failed, raise the last error
+                if last_error:
+                    raise last_error
+                    
+        except (httpx.HTTPError, CircuitOpenError) as e:
+            # API is not working - try web scraping fallback
+            if isinstance(e, CircuitOpenError):
+                logger.warning("Circuit breaker is open, falling back to web scraper.")
+            else:
+                logger.warning("Dify Marketplace API has been updated, falling back to web scraper.")
             try:
                 from app.services.marketplace_scraper import marketplace_fallback_service
                 scraped_result = await marketplace_fallback_service.scraper.scrape_plugin_list(
                     page=page, per_page=per_page, category=category, query=query
                 )
                 
-                # Add error info
-                scraped_result["original_error"] = str(e)
+                # Add API status info
+                scraped_result["api_status"] = "incompatible"
                 scraped_result["fallback_used"] = True
-                scraped_result["fallback_reason"] = "All API endpoints failed"
+                scraped_result["fallback_reason"] = "API endpoints changed"
                 
                 # Cache the scraped result
                 MarketplaceService._set_cache(cache_key, scraped_result)
@@ -209,14 +236,13 @@ class MarketplaceService:
                 
             except Exception as scrape_error:
                 logger.error(f"Web scraping also failed: {scrape_error}")
-                # Return empty result on error
                 return {
                     "plugins": [],
                     "total": 0,
                     "page": page,
                     "per_page": per_page,
-                    "error": str(e),
-                    "warning": "Unable to connect to Dify Marketplace API. Both endpoints and web scraping failed."
+                    "error": "Dify Marketplace API has changed and web scraping failed.",
+                    "api_status": "incompatible"
                 }
     
     @staticmethod

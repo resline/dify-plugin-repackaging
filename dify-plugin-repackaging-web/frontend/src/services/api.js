@@ -57,6 +57,11 @@ export const taskService = {
     const response = await api.get('/tasks', { params: { limit } });
     return response.data;
   },
+
+  listCompletedFiles: async (limit = 10) => {
+    const response = await api.get('/tasks/completed', { params: { limit } });
+    return response.data;
+  },
 };
 
 // Re-export marketplaceService from marketplace.js for backward compatibility

@@ -36,7 +36,12 @@ def get_async_client(**kwargs) -> httpx.AsyncClient:
             max_keepalive_connections=5,
             max_connections=10,
             keepalive_expiry=30.0
-        )
+        ),
+        "headers": {
+            "User-Agent": f"{settings.APP_NAME}/{settings.APP_VERSION}",
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
     }
     
     # Merge with provided kwargs (provided kwargs override defaults)
