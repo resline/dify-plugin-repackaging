@@ -12,21 +12,30 @@ const api = axios.create({
 // Handle API errors consistently
 const handleApiError = (error: unknown): never => {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<{ detail?: string; message?: string }>;
+    const axiosError = error as AxiosError<{ detail?: string; message?: string; error?: string }>;
     if (axiosError.response) {
       // Server responded with error status
-      throw new Error(
+      const errorMessage = 
         axiosError.response.data?.detail || 
         axiosError.response.data?.message || 
-        'API request failed'
-      );
+        axiosError.response.data?.error ||
+        `API request failed (${axiosError.response.status})`;
+      
+      // Add more context for specific status codes
+      if (axiosError.response.status === 502) {
+        throw new Error('Marketplace service is temporarily unavailable. Please try again later.');
+      } else if (axiosError.response.status === 503) {
+        throw new Error('Service overloaded. Please wait a moment and try again.');
+      }
+      
+      throw new Error(errorMessage);
     } else if (axiosError.request) {
       // Request was made but no response
-      throw new Error('No response from server');
+      throw new Error('Cannot connect to the service. Please check your connection.');
     }
   }
   // Something else happened
-  throw new Error(error instanceof Error ? error.message : 'Request failed');
+  throw new Error(error instanceof Error ? error.message : 'An unexpected error occurred');
 };
 
 interface SearchParams {
@@ -72,12 +81,49 @@ interface AuthorsResult {
 
 export const marketplaceService = {
   /**
+   * Check the status of the marketplace API
+   */
+  checkStatus: async (): Promise<{
+    marketplace_api: { status: string; error?: string };
+    circuit_breaker: { state: string; failure_count: number };
+    recommendations?: any;
+  }> => {
+    try {
+      const response = await api.get('/marketplace/status', { timeout: 5000 });
+      return response.data;
+    } catch (error) {
+      // If status check fails, return a default error state
+      return {
+        marketplace_api: { status: 'error', error: 'Status check failed' },
+        circuit_breaker: { state: 'unknown', failure_count: 0 }
+      };
+    }
+  },
+
+  /**
    * Search for plugins in the marketplace
    */
   searchPlugins: async (params: SearchParams = {}): Promise<SearchResult> => {
     try {
-      const response = await api.get<SearchResult>('/marketplace/plugins', { params });
-      return response.data;
+      const response = await api.get<SearchResult>('/marketplace/plugins', { 
+        params,
+        timeout: 30000  // 30 second timeout
+      });
+      
+      // Validate response structure
+      const data = response.data;
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response from server');
+      }
+      
+      // Ensure required fields exist with defaults
+      return {
+        plugins: Array.isArray(data.plugins) ? data.plugins : [],
+        total: data.total || 0,
+        page: data.page || params.page || 1,
+        per_page: data.per_page || params.per_page || 20,
+        ...data  // Include any additional fields like error, fallback_used, etc.
+      };
     } catch (error) {
       return handleApiError(error);
     }

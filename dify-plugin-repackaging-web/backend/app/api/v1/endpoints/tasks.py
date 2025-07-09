@@ -115,9 +115,20 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
                 latest_version = await MarketplaceService.get_latest_version(author, name)
                 
                 if not latest_version:
+                    # Try to provide more specific error message
+                    error_detail = (
+                        f"Unable to fetch plugin version for {author}/{name}. "
+                        f"Possible reasons:\n"
+                        f"1. The plugin may not exist in the marketplace\n"
+                        f"2. The marketplace API may be temporarily unavailable\n"
+                        f"3. The plugin URL format may have changed\n\n"
+                        f"Please verify the URL is correct or try using a direct .difypkg file URL instead.\n"
+                        f"Example marketplace URL: https://marketplace.dify.ai/plugins/langgenius/ollama"
+                    )
+                    logger.error(f"Failed to get latest version for marketplace URL: {task_data.url}")
                     raise HTTPException(
                         status_code=503,
-                        detail=f"Unable to fetch plugin version for {author}/{name}. The marketplace API may be unavailable or the plugin may not exist. Please check the URL or use a direct .difypkg file URL instead."
+                        detail=error_detail
                     )
                 
                 # Build download URL with latest version

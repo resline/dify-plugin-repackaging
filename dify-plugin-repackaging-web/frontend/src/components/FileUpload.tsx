@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, X, FileText, CheckCircle, Loader2, FileX } from 'lucide-react';
+import { Upload, X, FileText, CheckCircle, Loader2, FileX, Info } from 'lucide-react';
 
 interface FileUploadProps {
   onFileSelect: (data: { file: File } | null) => void;
@@ -94,7 +94,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
     setSelectedFile(file);
     onFileSelect({ file });
     
-    // Simulate upload progress
+    // Show file preparation progress
     setUploadProgress(0);
     const interval = setInterval(() => {
       setUploadProgress(prev => {
@@ -174,9 +174,24 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
               {dragActive ? 'Drop your file here' : 'Drop your .difypkg file here, or click to browse'}
             </p>
             
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Maximum file size: 100MB
-            </p>
+            <div className="mt-2 flex items-center justify-center space-x-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Maximum upload size: 100MB
+              </p>
+              <div className="group relative">
+                <Info className="h-3 w-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                  <div className="text-left">
+                    <p className="font-semibold mb-1">File Size Limits:</p>
+                    <p>• Upload: 100MB max</p>
+                    <p>• Download: 500MB max</p>
+                  </div>
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                    <div className="border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Visual indicator for drag */}
             {dragActive && (
@@ -214,12 +229,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
             </button>
           </div>
           
-          {/* Upload progress */}
+          {/* File status */}
           {uploadProgress < 100 ? (
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
-                <span>Validating file...</span>
-                <span>{uploadProgress}%</span>
+                <span>File selected</span>
+                <span>Preparing...</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
                 <div 
@@ -231,7 +246,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
           ) : (
             <div className="mt-3 flex items-center text-xs text-green-600 dark:text-green-400">
               <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-              Ready to repackage
+              File ready - click "Start Repackaging" to begin
             </div>
           )}
         </div>

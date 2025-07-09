@@ -40,9 +40,35 @@ RUN mkdir -p /app/scripts && \
     wget -q https://github.com/resline/dify-plugin-repackaging/raw/main/plugin_repackaging.sh && \
     chmod +x dify-plugin-linux-amd64-5g plugin_repackaging.sh
 
+# Create Redis config for persistence
+RUN mkdir -p /var/lib/redis && \
+    echo "dir /var/lib/redis\n\
+save 900 1\n\
+save 300 10\n\
+save 60 10000\n\
+appendonly yes\n\
+appendfilename \"appendonly.aof\"" > /etc/redis/redis.conf
+
+# Create log directory
+RUN mkdir -p /var/log/supervisor
+
 # Create supervisor config
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
+user=root\n\
+logfile=/var/log/supervisor/supervisord.log\n\
+logfile_maxbytes=50MB\n\
+logfile_backups=10\n\
+loglevel=info\n\
+pidfile=/var/run/supervisord.pid\n\
+\n\
+[program:redis]\n\
+command=redis-server /etc/redis/redis.conf\n\
+autostart=true\n\
+autorestart=true\n\
+priority=1\n\
+stdout_logfile=/var/log/redis.log\n\
+stderr_logfile=/var/log/redis.err\n\
 \n\
 [program:backend]\n\
 command=uvicorn app.main:app --host 0.0.0.0 --port 8000 --limit-max-requests 1000 --limit-concurrency 1000\n\
@@ -50,13 +76,32 @@ directory=/app\n\
 autostart=true\n\
 autorestart=true\n\
 environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\",MAX_UPLOAD_SIZE=\"104857600\"\n\
+startsecs=10\n\
+stopwaitsecs=60\n\
+stdout_logfile=/var/log/backend.log\n\
+stderr_logfile=/var/log/backend.err\n\
+stdout_logfile_maxbytes=10MB\n\
+stdout_logfile_backups=3\n\
+stderr_logfile_maxbytes=10MB\n\
+stderr_logfile_backups=3\n\
 \n\
 [program:worker]\n\
-command=celery -A app.workers.celery_app worker --loglevel=info\n\
+command=celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=100\n\
 directory=/app\n\
 autostart=true\n\
-autorestart=true\n\
+autorestart=unexpected\n\
+exitcodes=0\n\
 environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\"\n\
+startsecs=10\n\
+stopwaitsecs=600\n\
+stopasgroup=true\n\
+killasgroup=true\n\
+stdout_logfile=/var/log/celery-worker.log\n\
+stderr_logfile=/var/log/celery-worker.err\n\
+stdout_logfile_maxbytes=10MB\n\
+stdout_logfile_backups=3\n\
+stderr_logfile_maxbytes=10MB\n\
+stderr_logfile_backups=3\n\
 \n\
 [program:celery-beat]\n\
 command=celery -A app.workers.celery_app beat --loglevel=info\n\
@@ -64,17 +109,27 @@ directory=/app\n\
 autostart=true\n\
 autorestart=true\n\
 environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\"\n\
+startsecs=10\n\
+stopwaitsecs=60\n\
+stdout_logfile=/var/log/celery-beat.log\n\
+stderr_logfile=/var/log/celery-beat.err\n\
 \n\
 [program:nginx]\n\
 command=nginx -g 'daemon off;'\n\
 autostart=true\n\
-autorestart=true" > /etc/supervisor/conf.d/supervisord.conf
+autorestart=true\n\
+startsecs=5\n\
+stopwaitsecs=30\n\
+stdout_logfile=/var/log/nginx-supervisor.log\n\
+stderr_logfile=/var/log/nginx-supervisor.err" > /etc/supervisor/conf.d/supervisord.conf
 
 # Create nginx config for all-in-one setup
 RUN echo 'events { worker_connections 1024; }\n\
 http {\n\
     include /etc/nginx/mime.types;\n\
     default_type application/octet-stream;\n\
+    keepalive_timeout 1800s;\n\
+    send_timeout 1800s;\n\
     \n\
     server {\n\
         listen 80;\n\
@@ -94,9 +149,9 @@ http {\n\
             proxy_set_header X-Real-IP $remote_addr;\n\
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
             proxy_set_header X-Forwarded-Proto $scheme;\n\
-            proxy_connect_timeout 300s;\n\
-            proxy_send_timeout 300s;\n\
-            proxy_read_timeout 300s;\n\
+            proxy_connect_timeout 1800s;\n\
+            proxy_send_timeout 1800s;\n\
+            proxy_read_timeout 1800s;\n\
             proxy_request_buffering off;\n\
             proxy_buffering off;\n\
         }\n\

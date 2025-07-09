@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     FILE_RETENTION_HOURS: int = 24
     
     # Security
-    RATE_LIMIT_PER_MINUTE: int = 10
+    RATE_LIMIT_PER_MINUTE: int = 30
     ALLOWED_DOWNLOAD_DOMAINS: list[str] = [
         "github.com",
         "githubusercontent.com", 
@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     
     # WebSocket
     WS_HEARTBEAT_INTERVAL: int = 30
+    
+    # HTTP Client
+    HTTP_TIMEOUT: float = 30.0
+    HTTP_CONNECT_TIMEOUT: float = 10.0
+    HTTP_READ_TIMEOUT: float = 60.0
+    HTTP_WRITE_TIMEOUT: float = 30.0
+    HTTP_POOL_TIMEOUT: float = 10.0
     
     class Config:
         env_file = ".env"

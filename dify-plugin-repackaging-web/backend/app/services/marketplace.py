@@ -3,6 +3,7 @@ from typing import List, Dict, Optional, Tuple
 from urllib.parse import urlparse
 from app.core.config import settings
 from app.workers.celery_app import redis_client
+from app.utils.http_client import get_async_client
 import logging
 import json
 import re
@@ -123,7 +124,8 @@ class MarketplaceService:
                 request_body["author"] = author
             
             # Make API request to the new endpoint
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with get_async_client() as client:
+                logger.info(f"Making marketplace API request to: {marketplace_api_url}/api/v1/plugins/search/advanced")
                 try:
                     # Try the new search endpoint with circuit breaker
                     response = await MarketplaceService._make_api_request(
@@ -366,11 +368,14 @@ class MarketplaceService:
         
         # Check cache
         cached_result = MarketplaceService._get_from_cache(cache_key)
-        if cached_result:
+        if cached_result and isinstance(cached_result, list):
             return cached_result
         
+        # Default categories
+        default_categories = ["agent", "tool", "model", "extension", "workflow"]
+        
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
                     f"{settings.MARKETPLACE_API_URL}/api/v1/categories"
                 )
@@ -378,15 +383,28 @@ class MarketplaceService:
                 
                 result = response.json()
                 
-                # Cache the result
-                MarketplaceService._set_cache(cache_key, result)
+                # Handle different response formats
+                if isinstance(result, list):
+                    categories = result
+                elif isinstance(result, dict) and "categories" in result:
+                    categories = result["categories"]
+                else:
+                    logger.warning(f"Unexpected categories response format: {type(result)}")
+                    categories = default_categories
                 
-                return result
+                # Validate categories
+                if not categories or not isinstance(categories, list):
+                    categories = default_categories
+                
+                # Cache the result
+                MarketplaceService._set_cache(cache_key, categories)
+                
+                return categories
                 
         except httpx.HTTPError as e:
             logger.error(f"Error getting categories: {e}")
             # Return default categories on error
-            return ["agent", "tool", "model", "extension", "workflow"]
+            return default_categories
     
     @staticmethod
     def parse_marketplace_url(url: str) -> Optional[Tuple[str, str]]:
@@ -397,29 +415,48 @@ class MarketplaceService:
         - https://marketplace.dify.ai/plugins/langgenius/ollama
         - http://marketplace.dify.ai/plugins/langgenius/ollama/
         - https://marketplace.dify.ai/plugins/langgenius/openai_api_compatible?source=...
+        - https://marketplace.dify.ai/plugin/langgenius/ollama (singular form)
+        - marketplace.dify.ai/plugins/langgenius/ollama (without protocol)
         
         Returns:
             Tuple of (author, name) if valid marketplace URL, None otherwise
         """
-        # Remove query parameters
-        url_without_query = url.split('?')[0].strip()
-        
-        # Parse the URL to extract components
-        parsed = urlparse(url_without_query)
-        
-        # Check if it's a marketplace URL
-        if parsed.netloc in ['marketplace.dify.ai', 'www.marketplace.dify.ai']:
-            # Extract plugin info from path
-            # Path format: /plugins/{author}/{name}
-            path_match = re.match(r'^/plugins/([^/]+)/([^/]+)/?$', parsed.path)
-            if path_match:
-                author = path_match.group(1)
-                name = path_match.group(2)
-                logger.info(f"Parsed marketplace URL: author={author}, name={name}")
-                return (author, name)
-        
-        logger.info(f"Not a marketplace URL: {url_without_query}")
-        return None
+        try:
+            # Clean the URL
+            url = url.strip()
+            
+            # Add protocol if missing
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+            
+            # Remove query parameters and fragments
+            url_without_query = url.split('?')[0].split('#')[0].strip()
+            
+            # Parse the URL to extract components
+            parsed = urlparse(url_without_query)
+            
+            # Check if it's a marketplace URL (with or without www)
+            if parsed.netloc in ['marketplace.dify.ai', 'www.marketplace.dify.ai']:
+                # Extract plugin info from path
+                # Support both /plugins/ and /plugin/ paths
+                path_match = re.match(r'^/plugins?/([^/]+)/([^/]+)/?$', parsed.path)
+                if path_match:
+                    author = path_match.group(1).strip()
+                    name = path_match.group(2).strip()
+                    
+                    # Validate author and name are not empty
+                    if author and name:
+                        logger.info(f"Parsed marketplace URL: author={author}, name={name}")
+                        return (author, name)
+                    else:
+                        logger.warning(f"Empty author or name in URL: {url_without_query}")
+            
+            logger.info(f"Not a valid marketplace URL: {url_without_query}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error parsing marketplace URL {url}: {e}")
+            return None
     
     @staticmethod
     async def get_latest_version(author: str, name: str) -> Optional[str]:
@@ -436,42 +473,69 @@ class MarketplaceService:
         try:
             logger.info(f"Getting latest version for {author}/{name}")
             
-            # Use the new API endpoint format
-            marketplace_api_url = "https://marketplace.dify.ai"
+            # Try multiple API formats for better compatibility
+            attempts = [
+                # New API format
+                {
+                    "url": f"https://marketplace.dify.ai/api/v1/plugins/{author}/{name}",
+                    "extractor": lambda r: r.get("data", {}).get("plugin", {}).get("latest_version") if r.get("code") == 0 else None
+                },
+                # Alternative format
+                {
+                    "url": f"https://marketplace.dify.ai/api/v1/plugins/{author}/{name}",
+                    "extractor": lambda r: r.get("latest_version")
+                },
+                # Direct plugin info
+                {
+                    "url": f"{settings.MARKETPLACE_API_URL}/api/v1/plugins/{author}/{name}",
+                    "extractor": lambda r: r.get("latest_version")
+                }
+            ]
             
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{marketplace_api_url}/api/v1/plugins/{author}/{name}",
-                    headers={"Content-Type": "application/json"}
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    
-                    # Extract latest_version from the new API response format
-                    if result.get("code") == 0 and "data" in result:
-                        plugin_data = result["data"].get("plugin", {})
-                        latest_version = plugin_data.get("latest_version")
+                for attempt in attempts:
+                    try:
+                        response = await client.get(
+                            attempt["url"],
+                            headers={"Content-Type": "application/json"}
+                        )
                         
-                        if latest_version:
-                            logger.info(f"Found latest version: {latest_version}")
-                            return latest_version
-                        else:
-                            logger.warning(f"No latest_version in response for {author}/{name}")
-                    else:
-                        logger.warning(f"Invalid API response for {author}/{name}: {result}")
-                else:
-                    logger.warning(f"API returned status {response.status_code} for {author}/{name}")
+                        if response.status_code == 200:
+                            result = response.json()
+                            latest_version = attempt["extractor"](result)
+                            
+                            if latest_version:
+                                logger.info(f"Found latest version: {latest_version} using {attempt['url']}")
+                                return latest_version
+                    except Exception as e:
+                        logger.debug(f"Attempt failed for {attempt['url']}: {e}")
+                        continue
             
-            # Fallback to old method if new API fails
-            logger.info(f"Trying fallback method for {author}/{name}")
+            # Fallback to search method
+            logger.info(f"Trying search method for {author}/{name}")
+            search_result = await MarketplaceService.search_plugins(
+                query=name,
+                author=author,
+                per_page=1
+            )
+            
+            if search_result.get("plugins"):
+                for plugin in search_result["plugins"]:
+                    if plugin.get("author") == author and plugin.get("name") == name:
+                        latest_version = plugin.get("latest_version")
+                        if latest_version:
+                            logger.info(f"Found latest version via search: {latest_version}")
+                            return latest_version
+            
+            # Final fallback to plugin details
+            logger.info(f"Trying plugin details method for {author}/{name}")
             plugin_details = await MarketplaceService.get_plugin_details(author, name)
             
             if plugin_details and 'latest_version' in plugin_details:
                 logger.info(f"Found latest version in plugin details: {plugin_details['latest_version']}")
                 return plugin_details['latest_version']
             
-            logger.warning(f"No versions found for {author}/{name}")
+            logger.warning(f"No versions found for {author}/{name} after all attempts")
             return None
             
         except Exception as e:

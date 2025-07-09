@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CheckCircle, XCircle, Loader, Download, AlertCircle, Package, User, Tag, Plus, RefreshCw, Sparkles, PartyPopper } from 'lucide-react';
-import { taskService, createWebSocket } from '../services/api';
+import { taskService } from '../services/api';
+import { createReconnectingWebSocket, ReconnectingWebSocket } from '../services/websocket';
+import { WebSocketConnectionState } from '../types/websocket';
+import WebSocketStatus from './WebSocketStatus';
 import LogViewer from './LogViewer';
 import Confetti from './Confetti';
 import { useToast } from './Toast';
@@ -14,7 +17,8 @@ interface TaskStatusProps {
 
 const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, onNewTask }) => {
   const [task, setTask] = useState<any>(null);
-  const [wsStatus, setWsStatus] = useState('connecting');
+  const [wsStatus, setWsStatus] = useState<WebSocketConnectionState>('connecting');
+  const wsRef = useRef<ReconnectingWebSocket | null>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const logIdCounter = useRef(0);
   const [logHeight, setLogHeight] = useState(350);
@@ -39,55 +43,62 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
     // Initial fetch
     fetchTaskStatus();
 
-    // Setup WebSocket
-    const ws = createWebSocket(taskId);
-
-    ws.onopen = () => {
-      setWsStatus('connected');
-      addLogEntry('info', 'Connected to task status updates');
-    };
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type !== 'heartbeat') {
-        setTask(data);
-        
-        // Add log entry for status changes and messages
-        if (data.message || data.status) {
-          const logLevel = data.status === 'failed' ? 'error' : 
-                          data.status === 'completed' ? 'success' :
-                          data.status === 'processing' || data.status === 'downloading' ? 'processing' : 'info';
+    // Setup WebSocket with auto-reconnect
+    const ws = createReconnectingWebSocket(taskId, {
+      onOpen: () => {
+        setWsStatus('connected');
+        addLogEntry('info', 'Connected to task status updates');
+      },
+      onMessage: (data) => {
+        if (data.type !== 'heartbeat' && data.type !== 'ping' && data.type !== 'pong') {
+          setTask(data);
           
-          addLogEntry(logLevel, data.message || getStatusText(data.status), data.error);
+          // Add log entry for status changes and messages
+          if (data.message || data.status) {
+            const logLevel = data.status === 'failed' ? 'error' : 
+                            data.status === 'completed' ? 'success' :
+                            data.status === 'processing' || data.status === 'downloading' ? 'processing' : 'info';
+            
+            addLogEntry(logLevel, data.message || getStatusText(data.status), data.error);
+          }
+          
+          if (data.status === 'completed' && !hasShownCompletionRef.current) {
+            hasShownCompletionRef.current = true;
+            setShowConfetti(true);
+            success('Plugin repackaged successfully! 🎉');
+            setTimeout(() => setShowConfetti(false), 5000);
+            onComplete(data);
+          } else if (data.status === 'failed') {
+            showError(data.error || 'Task failed');
+            onError(data.error || 'Task failed');
+          }
         }
-        
-        if (data.status === 'completed' && !hasShownCompletionRef.current) {
-          hasShownCompletionRef.current = true;
-          setShowConfetti(true);
-          success('Plugin repackaged successfully! 🎉');
-          setTimeout(() => setShowConfetti(false), 5000);
-          onComplete(data);
-        } else if (data.status === 'failed') {
-          showError(data.error || 'Task failed');
-          onError(data.error || 'Task failed');
+      },
+      onError: () => {
+        setWsStatus('error');
+        // Only log error if not already in error state to avoid spam
+        if (wsStatus !== 'error') {
+          addLogEntry('error', 'WebSocket connection error', 'Attempting to reconnect...');
         }
-      }
-    };
-
-    ws.onerror = () => {
-      setWsStatus('error');
-      addLogEntry('error', 'WebSocket connection error', 'Failed to receive real-time updates');
-    };
-
-    ws.onclose = () => {
-      setWsStatus('disconnected');
-      if (task?.status !== 'completed' && task?.status !== 'failed') {
-        addLogEntry('warning', 'Disconnected from real-time updates', 'Click refresh to check status');
-      }
-    };
+      },
+      onClose: () => {
+        setWsStatus('disconnected');
+        if (task?.status !== 'completed' && task?.status !== 'failed' && wsStatus === 'connected') {
+          addLogEntry('warning', 'Connection lost', 'Attempting to reconnect automatically...');
+        }
+      },
+      autoReconnect: true,
+      reconnectInterval: 3000,
+      maxReconnectAttempts: 10
+    });
+    
+    wsRef.current = ws;
 
     return () => {
-      ws.close();
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, [taskId, onComplete, onError, success, showError]);
 
@@ -204,7 +215,15 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {wsStatus === 'disconnected' && task.status !== 'completed' && task.status !== 'failed' && (
+            <WebSocketStatus 
+              status={wsStatus} 
+              onReconnect={() => {
+                if (wsRef.current) {
+                  wsRef.current.reconnect();
+                }
+              }}
+            />
+            {(wsStatus === 'disconnected' || wsStatus === 'error') && task.status !== 'completed' && task.status !== 'failed' && (
               <button
                 onClick={fetchTaskStatus}
                 className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"

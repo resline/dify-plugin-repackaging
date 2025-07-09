@@ -168,6 +168,13 @@ class CircuitBreaker:
             "last_failure_time": self.last_failure_time,
             "name": self.name
         }
+    
+    def reset(self):
+        """Manually reset the circuit breaker to closed state"""
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = self.CLOSED
+        logger.info(f"{self.name}: Circuit manually reset to closed state")
 
 
 class CircuitOpenError(Exception):
@@ -177,8 +184,8 @@ class CircuitOpenError(Exception):
 
 # Create singleton instances for different services
 marketplace_circuit_breaker = CircuitBreaker(
-    failure_threshold=3,
-    recovery_timeout=30,
+    failure_threshold=5,  # Increased from 3 to be more tolerant
+    recovery_timeout=15,  # Reduced from 30 to recover faster
     expected_exception=Exception,
     name="MarketplaceAPI"
 )

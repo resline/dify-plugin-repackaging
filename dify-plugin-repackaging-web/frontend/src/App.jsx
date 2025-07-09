@@ -5,13 +5,20 @@ import TaskStatus from './components/TaskStatus';
 import { taskService } from './services/api';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastContainer, useToast } from './components/Toast';
+import useDeepLink from './hooks/useDeepLink';
 
 function AppContent() {
   const { toasts, success, error, removeToast } = useToast();
+  const deepLinkData = useDeepLink();
   const [currentTask, setCurrentTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [initialUrl, setInitialUrl] = useState('');
   const [currentTab, setCurrentTab] = useState(() => {
-    // Restore last selected tab from localStorage
+    // Check for deep link data first
+    if (deepLinkData?.type === 'marketplace') {
+      return 'marketplace';
+    }
+    // Otherwise restore last selected tab from localStorage
     return localStorage.getItem('lastSelectedTab') || 'url';
   });
 
@@ -19,6 +26,34 @@ function AppContent() {
   useEffect(() => {
     localStorage.setItem('lastSelectedTab', currentTab);
   }, [currentTab]);
+
+  // Handle deep link data
+  useEffect(() => {
+    if (deepLinkData && !currentTask) {
+      if (deepLinkData.type === 'url') {
+        setCurrentTab('url');
+        setInitialUrl(deepLinkData.url);
+        // Auto-submit if it's a valid marketplace URL or .difypkg file
+        if (deepLinkData.url.endsWith('.difypkg') || deepLinkData.url.includes('marketplace.dify.ai/plugins/')) {
+          handleSubmit({
+            url: deepLinkData.url,
+            platform: '',
+            suffix: 'offline'
+          });
+        }
+      } else if (deepLinkData.type === 'marketplace') {
+        setCurrentTab('marketplace');
+        // Auto-submit marketplace plugin
+        handleMarketplaceSubmit({
+          author: deepLinkData.author,
+          name: deepLinkData.name,
+          version: deepLinkData.version === 'latest' ? undefined : deepLinkData.version,
+          platform: '',
+          suffix: 'offline'
+        });
+      }
+    }
+  }, [deepLinkData]);
 
   const handleSubmit = async (formData) => {
     setIsLoading(true);
@@ -67,22 +102,42 @@ function AppContent() {
   };
 
   const handleFileSubmit = async (fileData) => {
+    // Validate fileData
+    if (!fileData || !fileData.file) {
+      error('No file selected. Please select a .difypkg file to upload.');
+      return;
+    }
+    
+    // Additional file validation
+    if (!fileData.file.name.endsWith('.difypkg')) {
+      error('Invalid file type. Please select a .difypkg file.');
+      return;
+    }
+    
+    // Check file size (100MB limit)
+    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+    if (fileData.file.size > maxSize) {
+      error('File size exceeds 100MB limit. Please select a smaller file.');
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
       const task = await taskService.uploadFile(
         fileData.file,
-        fileData.platform,
-        fileData.suffix
+        fileData.platform || '',
+        fileData.suffix || 'offline'
       );
       
       setCurrentTask(task);
       success('File upload task created successfully!');
     } catch (err) {
       console.error('Error creating file upload task:', err);
-      error(
-        err.response?.data?.detail || 'Failed to upload file. Please try again.'
-      );
+      const errorMessage = err.response?.data?.detail || 
+                          err.message || 
+                          'Failed to upload file. Please try again.';
+      error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -128,6 +183,8 @@ function AppContent() {
                 isLoading={isLoading}
                 currentTab={currentTab}
                 onTabChange={handleTabChange}
+                initialUrl={initialUrl}
+                deepLinkData={deepLinkData}
               />
               
               <div className="mt-8 pt-8 border-t border-gray-200">

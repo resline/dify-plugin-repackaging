@@ -5,6 +5,8 @@ import json
 import asyncio
 import logging
 from datetime import datetime
+from typing import Dict, List, Optional
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -13,19 +15,33 @@ router = APIRouter()
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: dict[str, list[WebSocket]] = {}
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+        self._connection_timestamps: Dict[WebSocket, float] = {}
+        self._cleanup_task: Optional[asyncio.Task] = None
+        self._lock = asyncio.Lock()
     
     async def connect(self, websocket: WebSocket, task_id: str):
         await websocket.accept()
-        if task_id not in self.active_connections:
-            self.active_connections[task_id] = []
-        self.active_connections[task_id].append(websocket)
+        async with self._lock:
+            if task_id not in self.active_connections:
+                self.active_connections[task_id] = []
+            self.active_connections[task_id].append(websocket)
+            self._connection_timestamps[websocket] = time.time()
+            
+            # Start cleanup task if not already running
+            if self._cleanup_task is None or self._cleanup_task.done():
+                self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
     
-    def disconnect(self, websocket: WebSocket, task_id: str):
-        if task_id in self.active_connections:
-            self.active_connections[task_id].remove(websocket)
-            if not self.active_connections[task_id]:
-                del self.active_connections[task_id]
+    async def disconnect(self, websocket: WebSocket, task_id: str):
+        async with self._lock:
+            if task_id in self.active_connections and websocket in self.active_connections[task_id]:
+                self.active_connections[task_id].remove(websocket)
+                if not self.active_connections[task_id]:
+                    del self.active_connections[task_id]
+            
+            # Remove from timestamps
+            if websocket in self._connection_timestamps:
+                del self._connection_timestamps[websocket]
     
     async def send_update(self, task_id: str, data: dict):
         if task_id in self.active_connections:
@@ -33,12 +49,57 @@ class ConnectionManager:
             for connection in self.active_connections[task_id]:
                 try:
                     await connection.send_json(data)
-                except:
+                except WebSocketDisconnect:
+                    logger.debug(f"WebSocket disconnected during send for task {task_id}")
+                    disconnected.append(connection)
+                except ConnectionError as e:
+                    logger.warning(f"Connection error during send for task {task_id}: {e}")
+                    disconnected.append(connection)
+                except Exception as e:
+                    logger.error(f"Unexpected error during send for task {task_id}: {e}")
                     disconnected.append(connection)
             
             # Remove disconnected clients
             for conn in disconnected:
-                self.disconnect(conn, task_id)
+                await self.disconnect(conn, task_id)
+    
+    async def _periodic_cleanup(self):
+        """Periodically clean up disconnected connections"""
+        while True:
+            try:
+                await asyncio.sleep(300)  # Run every 5 minutes
+                await self._cleanup_disconnected_connections()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in periodic cleanup: {e}")
+    
+    async def _cleanup_disconnected_connections(self):
+        """Remove stale connections that haven't responded to pings"""
+        async with self._lock:
+            current_time = time.time()
+            disconnected: List[tuple[WebSocket, str]] = []
+            
+            for task_id, connections in self.active_connections.items():
+                for conn in connections:
+                    try:
+                        # Try to ping the connection
+                        await conn.send_json({"type": "ping", "timestamp": current_time})
+                    except Exception:
+                        disconnected.append((conn, task_id))
+            
+            # Remove disconnected connections
+            for conn, task_id in disconnected:
+                logger.info(f"Removing stale connection for task {task_id}")
+                await self.disconnect(conn, task_id)
+    
+    async def send_ping(self, websocket: WebSocket) -> bool:
+        """Send a ping to check if connection is alive"""
+        try:
+            await websocket.send_json({"type": "ping", "timestamp": time.time()})
+            return True
+        except Exception:
+            return False
 
 
 manager = ConnectionManager()
@@ -66,14 +127,21 @@ async def broadcast_marketplace_selection(plugin_metadata: dict):
     for connection in all_connections:
         try:
             await connection.send_json(message)
-        except:
+        except WebSocketDisconnect:
+            logger.debug(f"WebSocket disconnected during broadcast")
+            disconnected.append(connection)
+        except ConnectionError as e:
+            logger.warning(f"Connection error during broadcast: {e}")
+            disconnected.append(connection)
+        except Exception as e:
+            logger.error(f"Unexpected error during broadcast: {e}")
             disconnected.append(connection)
     
     # Clean up disconnected clients
     for conn in disconnected:
         for task_id, connections in manager.active_connections.items():
             if conn in connections:
-                manager.disconnect(conn, task_id)
+                await manager.disconnect(conn, task_id)
                 break
 
 
@@ -102,20 +170,42 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
                     data = json.loads(message["data"])
                     await manager.send_update(task_id, data)
         
-        # Handle heartbeat
+        # Handle heartbeat with proper error handling
         async def heartbeat():
             try:
                 while True:
                     await asyncio.sleep(settings.WS_HEARTBEAT_INTERVAL)
-                    await websocket.send_json({"type": "heartbeat"})
-            except:
-                pass
+                    await websocket.send_json({"type": "heartbeat", "timestamp": time.time()})
+            except WebSocketDisconnect:
+                logger.debug(f"WebSocket disconnected during heartbeat for task {task_id}")
+            except ConnectionError as e:
+                logger.warning(f"Connection error during heartbeat for task {task_id}: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error during heartbeat for task {task_id}: {e}")
         
-        # Run both tasks concurrently
+        # Handle client messages (including pong responses)
+        async def handle_client_messages():
+            try:
+                while True:
+                    message = await websocket.receive_text()
+                    try:
+                        data = json.loads(message)
+                        if data.get("type") == "pong":
+                            # Update connection timestamp on pong
+                            manager._connection_timestamps[websocket] = time.time()
+                    except json.JSONDecodeError:
+                        pass
+            except WebSocketDisconnect:
+                raise
+            except Exception as e:
+                logger.error(f"Error handling client message: {e}")
+                raise
+        
+        # Run all tasks concurrently
         await asyncio.gather(
             listen_for_updates(),
             heartbeat(),
-            websocket.receive_text()  # This will raise exception on disconnect
+            handle_client_messages()
         )
         
     except WebSocketDisconnect:
@@ -123,6 +213,6 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
     except Exception as e:
         logger.exception(f"WebSocket error for task {task_id}")
     finally:
-        manager.disconnect(websocket, task_id)
+        await manager.disconnect(websocket, task_id)
         await pubsub.unsubscribe()
         await redis_client.close()

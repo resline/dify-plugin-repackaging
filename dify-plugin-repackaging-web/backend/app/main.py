@@ -1,18 +1,29 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.api import websocket
 from app.api.v1.endpoints import marketplace as v1_marketplace
 from app.api.v1.endpoints import tasks as v1_tasks
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 import logging
 import os
 
-# Configure logging
+# Configure logging with more detailed format
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
+
+# Set httpx logging to INFO level for better debugging
+logging.getLogger("httpx").setLevel(logging.INFO)
+
+# Create rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Create FastAPI app
 app = FastAPI(
@@ -20,6 +31,15 @@ app = FastAPI(
     version=settings.APP_VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+# Add rate limiter to app state
+app.state.limiter = limiter
+
+# Add rate limit error handler
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Add SlowAPI middleware
+app.add_middleware(SlowAPIMiddleware)
 
 # Set up CORS
 app.add_middleware(
@@ -39,6 +59,41 @@ app.include_router(v1_tasks.router, prefix=settings.API_V1_STR)
 
 # Create necessary directories
 os.makedirs(settings.TEMP_DIR, exist_ok=True)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests and their processing time"""
+    import time
+    start_time = time.time()
+    
+    # Log request details
+    logger = logging.getLogger(__name__)
+    logger.info(f"Request: {request.method} {request.url.path}")
+    
+    try:
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        
+        # Log response details
+        logger.info(
+            f"Response: {request.method} {request.url.path} - "
+            f"Status: {response.status_code} - "
+            f"Time: {process_time:.3f}s"
+        )
+        
+        # Add processing time header
+        response.headers["X-Process-Time"] = str(process_time)
+        return response
+        
+    except Exception as e:
+        process_time = time.time() - start_time
+        logger.error(
+            f"Request failed: {request.method} {request.url.path} - "
+            f"Error: {str(e)} - "
+            f"Time: {process_time:.3f}s"
+        )
+        raise
 
 
 @app.get("/")

@@ -18,13 +18,16 @@ services:
       - PYTHONPATH=/app
     volumes:
       - temp-data:/app/temp
+      - redis-data:/var/lib/redis
     expose:
       - "80"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost/health && celery -A app.workers.celery_app inspect ping --timeout=10 | grep -q OK && redis-cli ping | grep -q PONG"]
       interval: 30s
-      timeout: 10s
+      timeout: 20s
       retries: 3
+      start_period: 60s
 
 volumes:
   temp-data:
+  redis-data:

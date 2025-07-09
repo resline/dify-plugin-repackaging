@@ -105,13 +105,20 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
       setPlugins(plugins);
       setTotalPages(Math.ceil((result.total || 0) / (result.per_page || 12)));
       
-      if (plugins.length === 0) {
+      if (plugins.length === 0 && !result.error) {
         setError('No plugins found matching your criteria');
+      } else if (result.error) {
+        setError(result.error);
+      }
+      
+      // Check if we're using fallback
+      if (result.fallback_used) {
+        console.warn('Using fallback data source:', result.fallback_reason);
       }
       
     } catch (error: any) {
       console.error('Error searching plugins:', error);
-      setError(error.message || 'Failed to search plugins');
+      setError(error.message || 'Failed to search plugins. Please try again later.');
       setPlugins([]);
       setTotalPages(1);
     } finally {

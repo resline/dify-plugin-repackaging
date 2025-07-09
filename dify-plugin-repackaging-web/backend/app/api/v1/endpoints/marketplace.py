@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from app.services.marketplace import MarketplaceService
+from app.utils.circuit_breaker import marketplace_circuit_breaker
 import logging
 
 logger = logging.getLogger(__name__)
@@ -142,31 +143,61 @@ async def get_categories():
     """Get list of available plugin categories"""
     try:
         categories = await MarketplaceService.get_categories()
+        
+        # Ensure categories is always a list
+        if not isinstance(categories, list):
+            categories = ["agent", "tool", "model", "extension", "workflow"]
+        
         return {"categories": categories}
         
     except Exception as e:
         logger.exception("Error getting categories")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return default categories instead of error
+        return {"categories": ["agent", "tool", "model", "extension", "workflow"]}
 
 
 @router.get("/marketplace/authors")
 async def get_authors():
     """Get list of unique plugin authors from marketplace"""
     try:
+        # Try to get from cache first
+        from app.workers.celery_app import redis_client
+        import json
+        
+        cache_key = "marketplace:authors_list"
+        cached_authors = redis_client.get(cache_key)
+        if cached_authors:
+            return json.loads(cached_authors)
+        
         # Get first page of plugins with max results to extract authors
         result = await MarketplaceService.search_plugins(page=1, per_page=100)
+        
+        # Handle both successful and fallback responses
         plugins = result.get('plugins', [])
         
         # Extract unique authors
         authors = list(set(plugin.get('author', '') for plugin in plugins if plugin.get('author')))
         authors.sort()
         
-        return {"authors": authors}
+        # Add some common known authors if list is too small
+        if len(authors) < 5:
+            known_authors = ['langgenius', 'dify', 'community']
+            for author in known_authors:
+                if author not in authors:
+                    authors.append(author)
+            authors.sort()
+        
+        response = {"authors": authors}
+        
+        # Cache the result for 1 hour
+        redis_client.setex(cache_key, 3600, json.dumps(response))
+        
+        return response
         
     except Exception as e:
         logger.exception("Error getting authors")
-        # Return empty list instead of raising error to prevent frontend issues
-        return {"authors": []}
+        # Return some default authors instead of empty list
+        return {"authors": ['langgenius', 'dify', 'community']}
 
 
 @router.post("/marketplace/plugins/{author}/{name}/{version}/download-url")
@@ -191,4 +222,108 @@ async def get_download_url(author: str, name: str, version: str):
         
     except Exception as e:
         logger.exception(f"Error building download URL for {author}/{name}/{version}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/marketplace/parse-url")
+async def parse_marketplace_url(
+    url: str = Query(..., description="Marketplace URL to parse")
+):
+    """
+    Parse a marketplace URL to extract plugin information
+    
+    This endpoint helps debug URL parsing issues and can be used to validate
+    marketplace URLs before processing.
+    
+    Example:
+    - Input: https://marketplace.dify.ai/plugins/langgenius/ollama
+    - Output: {"author": "langgenius", "name": "ollama", "valid": true}
+    """
+    try:
+        # Parse the URL
+        parsed = MarketplaceService.parse_marketplace_url(url)
+        
+        if parsed:
+            author, name = parsed
+            # Try to get the latest version
+            latest_version = await MarketplaceService.get_latest_version(author, name)
+            
+            return {
+                "valid": True,
+                "author": author,
+                "name": name,
+                "latest_version": latest_version,
+                "download_url": MarketplaceService.construct_download_url(author, name, latest_version) if latest_version else None
+            }
+        else:
+            return {
+                "valid": False,
+                "error": "Not a valid marketplace plugin URL",
+                "expected_format": "https://marketplace.dify.ai/plugins/{author}/{name}"
+            }
+            
+    except Exception as e:
+        logger.exception(f"Error parsing marketplace URL: {url}")
+        return {
+            "valid": False,
+            "error": str(e)
+        }
+
+
+@router.get("/marketplace/status")
+async def get_marketplace_status():
+    """Get the current status of the marketplace API and circuit breaker"""
+    try:
+        circuit_state = marketplace_circuit_breaker.get_state()
+        
+        # Try a simple API call to check if marketplace is accessible
+        api_status = "unknown"
+        api_error = None
+        
+        try:
+            # Quick check with minimal impact
+            result = await MarketplaceService.search_plugins(page=1, per_page=1)
+            if result.get("plugins") is not None:
+                api_status = "operational"
+            elif result.get("fallback_used"):
+                api_status = "degraded"
+                api_error = result.get("fallback_reason", "Using fallback")
+            else:
+                api_status = "error"
+                api_error = result.get("error", "Unknown error")
+        except Exception as e:
+            api_status = "error"
+            api_error = str(e)
+        
+        return {
+            "marketplace_api": {
+                "status": api_status,
+                "error": api_error
+            },
+            "circuit_breaker": circuit_state,
+            "recommendations": {
+                "circuit_open": "Wait for automatic recovery or manually reset",
+                "api_error": "Check marketplace URL and network connectivity"
+            } if circuit_state["state"] == "open" or api_status == "error" else None
+        }
+        
+    except Exception as e:
+        logger.exception("Error checking marketplace status")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/marketplace/reset-circuit-breaker")
+async def reset_circuit_breaker():
+    """Manually reset the marketplace circuit breaker"""
+    try:
+        marketplace_circuit_breaker.reset()
+        
+        return {
+            "status": "success",
+            "message": "Circuit breaker has been reset",
+            "circuit_state": marketplace_circuit_breaker.get_state()
+        }
+        
+    except Exception as e:
+        logger.exception("Error resetting circuit breaker")
         raise HTTPException(status_code=500, detail=str(e))

@@ -14,16 +14,28 @@ const platforms = [
   { value: 'macosx_11_0_arm64', label: 'macOS ARM64' },
 ];
 
-const UploadForm = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading, currentTab, onTabChange }) => {
-  const [url, setUrl] = useState('');
+const UploadForm = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading, currentTab, onTabChange, initialUrl, deepLinkData }) => {
+  const [url, setUrl] = useState(initialUrl || '');
   const [platform, setPlatform] = useState(platforms[0]);
   const [suffix, setSuffix] = useState('offline');
   const [errors, setErrors] = useState({});
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  // Initialize URL from props
+  React.useEffect(() => {
+    if (initialUrl && !hasInitialized) {
+      setUrl(initialUrl);
+      setHasInitialized(true);
+    }
+  }, [initialUrl, hasInitialized]);
 
   const isMarketplaceUrl = (url) => {
     // Check if URL matches marketplace pattern
-    const marketplacePattern = /^https?:\/\/marketplace\.dify\.ai\/plugins\/[^\/]+\/[^\/]+\/?$/;
-    return marketplacePattern.test(url);
+    // Support both /plugins/ and /plugin/ paths, with or without protocol
+    const cleanUrl = url.trim();
+    const marketplacePattern = /^(https?:\/\/)?(www\.)?marketplace\.dify\.ai\/plugins?\/[^\/]+\/[^\/]+\/?$/i;
+    return marketplacePattern.test(cleanUrl) || 
+           marketplacePattern.test('https://' + cleanUrl);
   };
 
   const validateForm = () => {
@@ -31,10 +43,16 @@ const UploadForm = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading, cu
     
     if (!url) {
       newErrors.url = 'URL is required';
-    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      newErrors.url = 'URL must start with http:// or https://';
-    } else if (!url.endsWith('.difypkg') && !isMarketplaceUrl(url)) {
-      newErrors.url = 'URL must point to a .difypkg file or be a marketplace plugin URL';
+    } else {
+      const cleanUrl = url.trim();
+      // Allow marketplace URLs with or without protocol
+      if (isMarketplaceUrl(cleanUrl)) {
+        // Valid marketplace URL
+      } else if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        newErrors.url = 'URL must start with http:// or https://';
+      } else if (!cleanUrl.endsWith('.difypkg')) {
+        newErrors.url = 'URL must point to a .difypkg file or be a marketplace plugin URL';
+      }
     }
     
     if (!suffix) {
@@ -207,6 +225,7 @@ const UploadForm = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading, cu
           onSelectPlugin={handleMarketplaceSelect}
           platform={platform.value}
           suffix={suffix}
+          deepLinkData={deepLinkData}
         />
       ) : (
         <div className="space-y-6">
