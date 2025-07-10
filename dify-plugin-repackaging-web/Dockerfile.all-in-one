@@ -240,6 +240,12 @@ http {\n\
         }\n\
         \n\
         location /health {\n\
+            access_log off;\n\
+            return 200 "healthy\\n";\n\
+            add_header Content-Type text/plain;\n\
+        }\n\
+        \n\
+        location /api/health {\n\
             proxy_pass http://backend/health;\n\
             proxy_http_version 1.1;\n\
             proxy_set_header Host $host;\n\

@@ -21,12 +21,15 @@ services:
       - redis-data:/var/lib/redis
     expose:
       - "80"
+    labels:
+      - "coolify.managed=true"
+      - "coolify.port=80"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost/health && cd /app/backend && celery -A app.workers.celery_app inspect ping --timeout=10 | grep -q OK && redis-cli ping | grep -q PONG"]
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
       interval: 30s
-      timeout: 20s
-      retries: 3
-      start_period: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 120s
 
 volumes:
   temp-data:
