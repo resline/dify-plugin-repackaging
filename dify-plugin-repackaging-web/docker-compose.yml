@@ -1,88 +1,144 @@
 version: '3.8'
 
 services:
-  backend:
-    build: ./backend
-    container_name: dify-repack-backend
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost","http://localhost:80"]
-      - TEMP_DIR=/app/temp
-      - SCRIPTS_DIR=/app/scripts
+  redis:
+    image: redis:7-alpine
+    container_name: dify-plugin-redis
+    ports:
+      - "6379:6379"
     volumes:
-      - ./temp:/app/temp
-      - ./backend/scripts:/app/scripts:ro
-    depends_on:
-      - redis
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - app-network
 
-  worker:
-    build: ./backend
-    container_name: dify-repack-worker
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dify-plugin-backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 600
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_PASSWORD=
+      - DEBUG=True
+      - TEMP_DIR=/app/temp
+      - UPLOAD_DIR=/app/uploads
+      - BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:80","http://frontend:80"]
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/scripts:/app/scripts
+      - backend_temp:/app/temp
+      - backend_uploads:/app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  celery_worker:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dify-plugin-celery
     command: celery -A app.workers.celery_app worker --loglevel=info
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_PASSWORD=
+      - DEBUG=True
       - TEMP_DIR=/app/temp
-      - SCRIPTS_DIR=/app/scripts
+      - UPLOAD_DIR=/app/uploads
     volumes:
-      - ./temp:/app/temp
-      - ./backend/scripts:/app/scripts:ro
+      - ./backend/app:/app/app
+      - ./backend/scripts:/app/scripts
+      - backend_temp:/app/temp
+      - backend_uploads:/app/uploads
     depends_on:
-      - redis
-      - backend
-    networks:
-      - app-network
-
-  celery-beat:
-    build: ./backend
-    container_name: dify-repack-beat
-    command: celery -A app.workers.celery_app beat --loglevel=info
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      - redis
-      - backend
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     networks:
       - app-network
 
   frontend:
-    build: ./frontend
-    container_name: dify-repack-frontend
-    depends_on:
-      - backend
-    networks:
-      - app-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: dify-repack-redis
-    volumes:
-      - redis-data:/data
-    networks:
-      - app-network
-
-  nginx:
-    image: nginx:alpine
-    container_name: dify-repack-nginx
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dify-plugin-frontend
     ports:
       - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Development frontend with hot reload
+  frontend-dev:
+    image: node:20-alpine
+    container_name: dify-plugin-frontend-dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    profiles:
+      - dev
+    networks:
+      - app-network
+
+  # Playwright test runner
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.40.0-focal
+    container_name: dify-plugin-playwright
+    working_dir: /app
+    command: npx playwright test
+    environment:
+      - PLAYWRIGHT_BASE_URL=http://frontend:80
+      - CI=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - ./playwright-results:/app/playwright-report
+      - ./playwright-results:/app/test-results
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    profiles:
+      - test
     networks:
       - app-network
 
 volumes:
-  redis-data:
+  redis_data:
+  backend_temp:
+  backend_uploads:
 
 networks:
   app-network:
