@@ -540,6 +540,7 @@ async def download_result(task_id: str):
         
         task = json.loads(task_data)
         logger.info(f"Task status: {task.get('status')}")
+        logger.info(f"Task data: {json.dumps(task, indent=2)}")
         
         # Check if task is completed
         if task.get("status") != TaskStatus.COMPLETED.value:
@@ -554,17 +555,40 @@ async def download_result(task_id: str):
             logger.error(f"No output filename in task data: {task}")
             raise HTTPException(status_code=404, detail="Output file not found")
         
+        # Log environment info
+        logger.info(f"TEMP_DIR setting: {settings.TEMP_DIR}")
+        logger.info(f"Output filename: {output_filename}")
+        
         # Build file path
         file_path = os.path.join(settings.TEMP_DIR, task_id, output_filename)
         logger.info(f"Looking for file at: {file_path}")
         
+        # Check parent directory
+        parent_dir = os.path.dirname(file_path)
+        if not os.path.exists(parent_dir):
+            logger.error(f"Parent directory does not exist: {parent_dir}")
+            # Try to list temp directory
+            if os.path.exists(settings.TEMP_DIR):
+                logger.info(f"TEMP_DIR contents: {os.listdir(settings.TEMP_DIR)}")
+            else:
+                logger.error(f"TEMP_DIR does not exist: {settings.TEMP_DIR}")
+            raise HTTPException(status_code=500, detail="Task directory not found")
+        
+        # List directory contents
+        logger.info(f"Task directory contents: {os.listdir(parent_dir)}")
+        
         if not os.path.exists(file_path):
             logger.error(f"File not found on disk: {file_path}")
-            # List directory contents for debugging
-            parent_dir = os.path.dirname(file_path)
-            if os.path.exists(parent_dir):
-                logger.info(f"Directory contents: {os.listdir(parent_dir)}")
+            # Check if file exists with different case
+            for fname in os.listdir(parent_dir):
+                logger.info(f"Found file: {fname} (looking for: {output_filename})")
+                if fname.lower() == output_filename.lower():
+                    logger.warning(f"File exists with different case: {fname}")
             raise HTTPException(status_code=404, detail="File not found on server")
+        
+        # Check file permissions
+        file_stat = os.stat(file_path)
+        logger.info(f"File permissions: {oct(file_stat.st_mode)}, size: {file_stat.st_size}")
         
         logger.info(f"Serving file: {file_path}")
         return FileResponse(
