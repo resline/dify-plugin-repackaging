@@ -19,8 +19,8 @@ class JSONResponseMiddleware(BaseHTTPMiddleware):
         # Process the request
         response = await call_next(request)
         
-        # Only process API endpoints
-        if request.url.path.startswith("/api/"):
+        # Only process API endpoints (excluding file downloads)
+        if request.url.path.startswith("/api/") and not request.url.path.endswith("/download"):
             # Check if response has a body
             if hasattr(response, "body_iterator"):
                 # Read the response body

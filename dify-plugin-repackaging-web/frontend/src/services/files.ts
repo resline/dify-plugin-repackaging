@@ -1,22 +1,9 @@
 import api from './api';
 import type { FileInfo, FileListResponse } from '../types/file';
 import axios from 'axios';
+import { withErrorHandling, logError } from './utils/errorHandler';
 
 const API_BASE_URL = '/api/v1';
-
-// Error handler specifically for file operations
-const handleFileError = (error: unknown, operation: string): never => {
-  if (axios.isAxiosError(error)) {
-    if (error.response?.status === 404) {
-      throw new Error(`File or endpoint not found (${operation})`);
-    } else if (error.response?.status === 403) {
-      throw new Error(`Access denied to file (${operation})`);
-    } else if (error.response?.status >= 500) {
-      throw new Error(`Server error during ${operation}. Please try again later.`);
-    }
-  }
-  throw error;
-};
 
 export const fileService = {
   /**
@@ -24,16 +11,19 @@ export const fileService = {
    * @param limit - Number of files to return (default: 20)
    * @param offset - Offset for pagination (default: 0)
    */
-  listFiles: async (limit: number = 20, offset: number = 0): Promise<FileListResponse> => {
-    try {
+  listFiles: withErrorHandling(
+    async (limit: number = 20, offset: number = 0): Promise<FileListResponse> => {
       const response = await api.get('/files', {
         params: { limit, offset }
       });
       return response.data;
-    } catch (error) {
-      return handleFileError(error, 'list files');
+    },
+    {
+      context: 'listFiles',
+      defaultValue: { files: [], total: 0, limit: 20, offset: 0 },
+      rethrow: false
     }
-  },
+  ),
 
   /**
    * Get download URL for a specific file
@@ -47,11 +37,13 @@ export const fileService = {
    * Delete a specific file
    * @param fileId - ID of the file to delete
    */
-  deleteFile: async (fileId: string): Promise<void> => {
-    try {
+  deleteFile: withErrorHandling(
+    async (fileId: string): Promise<void> => {
       await api.delete(`/files/${fileId}`);
-    } catch (error) {
-      return handleFileError(error, 'delete file');
+    },
+    {
+      context: 'deleteFile',
+      rethrow: true // Re-throw as this is a user action
     }
-  }
+  )
 };

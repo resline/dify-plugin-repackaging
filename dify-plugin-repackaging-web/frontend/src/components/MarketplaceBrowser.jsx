@@ -48,7 +48,9 @@ const MarketplaceBrowser = ({ onSelectPlugin, platform, suffix }) => {
       // Initial search
       searchPlugins();
     } catch (error) {
-      console.error('Error loading initial data:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error loading initial data:', error);
+      }
       setError('Failed to load marketplace data');
     }
   };
@@ -86,7 +88,9 @@ const MarketplaceBrowser = ({ onSelectPlugin, platform, suffix }) => {
       }
       
     } catch (error) {
-      console.error('Error searching plugins:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error searching plugins:', error);
+      }
       setError(error.message || 'Failed to search plugins');
       setPlugins([]);
       setTotalPages(1);

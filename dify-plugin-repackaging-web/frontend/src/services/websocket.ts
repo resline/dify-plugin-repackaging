@@ -49,7 +49,9 @@ export class ReconnectingWebSocket {
       this.ws = new WebSocket(this.getWebSocketUrl());
       this.setupEventHandlers();
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to create WebSocket:', error);
+      }
       this.scheduleReconnect();
     }
   }
@@ -93,12 +95,16 @@ export class ReconnectingWebSocket {
             }
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Error parsing WebSocket message:', error);
+        }
       }
     };
 
     this.ws.onerror = (error) => {
-      console.error(`WebSocket error for task ${this.taskId}:`, error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`WebSocket error for task ${this.taskId}:`, error);
+      }
       
       if (this.options.onError) {
         this.options.onError(error);
@@ -111,7 +117,9 @@ export class ReconnectingWebSocket {
       
       // Check for specific close codes
       if (event.code === 1008 && event.reason === 'Task not found') {
-        console.error(`Task ${this.taskId} not found. WebSocket connection rejected.`);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error(`Task ${this.taskId} not found. WebSocket connection rejected.`);
+        }
         // Don't attempt to reconnect for non-existent tasks
         this.isManualClose = true;
       }
@@ -136,7 +144,9 @@ export class ReconnectingWebSocket {
         // Check if we've received a response recently
         const timeSinceLastPong = Date.now() - this.lastPongTime;
         if (timeSinceLastPong > this.options.heartbeatInterval! * 2) {
-          console.warn(`No pong received for ${timeSinceLastPong}ms, reconnecting...`);
+          if (process.env.NODE_ENV !== 'test') {
+            console.warn(`No pong received for ${timeSinceLastPong}ms, reconnecting...`);
+          }
           this.reconnect();
           return;
         }
@@ -162,7 +172,9 @@ export class ReconnectingWebSocket {
     if (this.isReconnecting || this.isManualClose) return;
     
     if (this.reconnectAttempts >= this.options.maxReconnectAttempts!) {
-      console.error(`Max reconnection attempts (${this.options.maxReconnectAttempts}) reached for task ${this.taskId}`);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`Max reconnection attempts (${this.options.maxReconnectAttempts}) reached for task ${this.taskId}`);
+      }
       return;
     }
     
@@ -192,10 +204,14 @@ export class ReconnectingWebSocket {
         const message = typeof data === 'string' ? data : JSON.stringify(data);
         this.ws.send(message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Error sending WebSocket message:', error);
+        }
       }
     } else {
-      console.warn('WebSocket is not open, cannot send message');
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn('WebSocket is not open, cannot send message');
+      }
     }
   }
 

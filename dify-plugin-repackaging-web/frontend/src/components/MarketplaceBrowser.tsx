@@ -75,7 +75,9 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
       // Initial search
       searchPlugins();
     } catch (error) {
-      console.error('Error loading initial data:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error loading initial data:', error);
+      }
       setError('Failed to load marketplace data');
     }
   };
@@ -113,11 +115,15 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
       
       // Check if we're using fallback
       if (result.fallback_used) {
-        console.warn('Using fallback data source:', result.fallback_reason);
+        if (process.env.NODE_ENV !== 'test') {
+          console.warn('Using fallback data source:', result.fallback_reason);
+        }
       }
       
     } catch (error: any) {
-      console.error('Error searching plugins:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error searching plugins:', error);
+      }
       setError(error.message || 'Failed to search plugins. Please try again later.');
       setPlugins([]);
       setTotalPages(1);

@@ -1,0 +1,202 @@
+# Pre-commit hooks for code quality and quick tests
+# See https://pre-commit.com for more information
+
+default_language_version:
+  python: python3.12
+  node: "20"
+
+repos:
+  # General hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^.*\.(md|rst|txt)$
+      - id: end-of-file-fixer
+        exclude: ^.*\.(jpg|png|jpeg|gif|bmp|svg|ico)$
+      - id: check-yaml
+        args: ['--unsafe']
+      - id: check-json
+      - id: check-xml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: no-commit-to-branch
+        args: ['--branch', 'main', '--branch', 'master']
+
+  # Shell script checks
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: ['--severity=warning']
+        exclude: ^node_modules/
+
+  # Python specific hooks
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        language_version: python3.12
+        args: ['--line-length=100']
+        files: ^dify-plugin-repackaging-web/backend/
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile', 'black', '--line-length=100']
+        files: ^dify-plugin-repackaging-web/backend/
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: ['--max-line-length=100', '--extend-ignore=E203,W503']
+        files: ^dify-plugin-repackaging-web/backend/
+        additional_dependencies:
+          - flake8-docstrings
+          - flake8-bugbear
+          - flake8-comprehensions
+          - flake8-simplify
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        files: ^dify-plugin-repackaging-web/backend/
+        args: ['--ignore-missing-imports', '--check-untyped-defs']
+        additional_dependencies:
+          - types-requests
+          - types-redis
+          - types-PyYAML
+
+  # Security checks
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: ['-c', '.bandit', '-ll']
+        files: ^dify-plugin-repackaging-web/backend/
+
+  # JavaScript/TypeScript hooks
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.0.0-alpha.2
+    hooks:
+      - id: eslint
+        files: \.(js|jsx|ts|tsx)$
+        types: [file]
+        args: ['--fix']
+        additional_dependencies:
+          - eslint@8.56.0
+          - eslint-config-next@14.0.4
+          - '@typescript-eslint/parser@6.19.0'
+          - '@typescript-eslint/eslint-plugin@6.19.0'
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        files: \.(js|jsx|ts|tsx|json|css|scss|md|yml|yaml)$
+        exclude: ^(package-lock\.json|yarn\.lock)$
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint
+        args: ['--ignore', 'DL3008', '--ignore', 'DL3009']
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: ['-c', '.yamllint.yml']
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix']
+
+  # Git commit message linting
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  # Local hooks for quick tests
+  - repo: local
+    hooks:
+      # Python quick tests
+      - id: python-quick-tests
+        name: Python Quick Tests
+        entry: bash -c 'cd dify-plugin-repackaging-web/backend && python -m pytest tests/unit/core tests/unit/services -x -q --tb=short'
+        language: system
+        types: [python]
+        files: ^dify-plugin-repackaging-web/backend/app/
+        pass_filenames: false
+        stages: [push]
+
+      # JavaScript quick tests
+      - id: javascript-quick-tests
+        name: JavaScript Quick Tests
+        entry: bash -c 'cd dify-plugin-repackaging-web/frontend && npm run test:unit -- --passWithNoTests --maxWorkers=2'
+        language: system
+        types: [javascript, typescript]
+        files: ^dify-plugin-repackaging-web/frontend/(src|components)/
+        pass_filenames: false
+        stages: [push]
+
+      # Check for TODOs
+      - id: check-todos
+        name: Check TODOs
+        entry: bash -c 'git diff --cached --name-only | xargs grep -n "TODO\|FIXME\|XXX\|HACK" || true'
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
+      # Validate CI/CD workflows
+      - id: validate-github-workflows
+        name: Validate GitHub Workflows
+        entry: bash -c 'find .github/workflows -name "*.yml" -o -name "*.yaml" | xargs -I {} sh -c "echo Validating {}... && python -m yaml {} > /dev/null"'
+        language: system
+        files: ^\.github/workflows/
+        pass_filenames: false
+
+# Configuration for specific hooks
+exclude: |
+  (?x)^(
+    .*\.min\.(js|css)|
+    .*\.bundle\.(js|css)|
+    node_modules/.*|
+    venv/.*|
+    \.git/.*|
+    \.pytest_cache/.*|
+    __pycache__/.*|
+    .*\.pyc|
+    .*\.pyo|
+    build/.*|
+    dist/.*|
+    .*\.egg-info/.*|
+    htmlcov/.*|
+    coverage/.*|
+    \.coverage|
+    .*\.log|
+    temp/.*|
+    tmp/.*
+  )$
+
+fail_fast: false
+minimum_pre_commit_version: '3.0.0'

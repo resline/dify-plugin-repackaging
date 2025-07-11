@@ -96,7 +96,7 @@ def process_repackaging(self, task_id: str, url: str, platform: str, suffix: str
             # For uploaded files, url is actually the local file path
             file_path = url
             filename = os.path.basename(file_path)
-            update_task_status(task_id, TaskStatus.PROCESSING, 10, f"Processing uploaded file: {filename}")
+            update_task_status(task_id, TaskStatus.PROCESSING, 10, f"Processing uploaded file: {filename}", original_filename=filename)
         else:
             # Update status to downloading
             update_task_status(task_id, TaskStatus.DOWNLOADING, 5, "Starting download...")
@@ -106,7 +106,7 @@ def process_repackaging(self, task_id: str, url: str, platform: str, suffix: str
                 DownloadService.download_file(url, task_id)
             )
             
-            update_task_status(task_id, TaskStatus.PROCESSING, 15, f"Downloaded {filename}")
+            update_task_status(task_id, TaskStatus.PROCESSING, 15, f"Downloaded {filename}", original_filename=filename)
         
         # Process repackaging
         async def run_repackaging():

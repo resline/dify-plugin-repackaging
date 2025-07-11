@@ -1,55 +1,35 @@
 import axios, { AxiosError } from 'axios';
+import { createAxiosWithRetry } from './utils/retry';
+import { withErrorHandling, toApiError, logError, getUserFriendlyErrorMessage } from './utils/errorHandler';
 
 const API_BASE_URL = '/api/v1';
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
+// Create axios instance with built-in retry logic
+const api = createAxiosWithRetry(
+  {
+    baseURL: API_BASE_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 30000, // 30 second timeout
   },
-});
-
-// Handle API errors consistently
-const handleApiError = (error: unknown): never => {
-  if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<{ detail?: string; message?: string; error?: string }>;
-    if (axiosError.response) {
-      // Server responded with error status
-      const errorMessage = 
-        axiosError.response.data?.detail || 
-        axiosError.response.data?.message || 
-        axiosError.response.data?.error ||
-        `API request failed (${axiosError.response.status})`;
-      
-      // Add more context for specific status codes
-      if (axiosError.response.status === 404) {
-        console.warn(`API endpoint not found: ${axiosError.config?.method?.toUpperCase()} ${axiosError.config?.url}`);
-        throw new Error(`Requested resource not found (404): ${axiosError.config?.url}`);
-      } else if (axiosError.response.status === 502) {
-        throw new Error('Marketplace service is temporarily unavailable. Please try again later.');
-      } else if (axiosError.response.status === 503) {
-        throw new Error('Service overloaded. Please wait a moment and try again.');
+  {
+    maxRetries: 3,
+    initialDelay: 1000,
+    maxDelay: 10000,
+    retryCondition: (error) => {
+      // Don't retry client errors (4xx) except for 408 (timeout) and 429 (rate limit)
+      if (error.response) {
+        const status = error.response.status;
+        if (status === 408 || status === 429) return true;
+        if (status >= 400 && status < 500) return false;
       }
-      
-      // Log error details for debugging
-      console.error('API Error:', {
-        status: axiosError.response.status,
-        url: axiosError.config?.url,
-        method: axiosError.config?.method,
-        data: axiosError.response.data
-      });
-      
-      throw new Error(errorMessage);
-    } else if (axiosError.request) {
-      // Request was made but no response
-      console.error('Network Error - No response received:', axiosError.config?.url);
-      throw new Error('Cannot connect to the service. Please check your connection.');
+      // Retry network errors and 5xx errors
+      return !error.response || (error.response.status >= 500);
     }
   }
-  // Something else happened
-  console.error('Unexpected error:', error);
-  throw new Error(error instanceof Error ? error.message : 'An unexpected error occurred');
-};
+);
+
 
 interface SearchParams {
   q?: string;
@@ -96,28 +76,30 @@ export const marketplaceService = {
   /**
    * Check the status of the marketplace API
    */
-  checkStatus: async (): Promise<{
-    marketplace_api: { status: string; error?: string };
-    circuit_breaker: { state: string; failure_count: number };
-    recommendations?: any;
-  }> => {
-    try {
+  checkStatus: withErrorHandling(
+    async (): Promise<{
+      marketplace_api: { status: string; error?: string };
+      circuit_breaker: { state: string; failure_count: number };
+      recommendations?: any;
+    }> => {
       const response = await api.get('/marketplace/status', { timeout: 5000 });
       return response.data;
-    } catch (error) {
-      // If status check fails, return a default error state
-      return {
+    },
+    {
+      context: 'checkStatus',
+      defaultValue: {
         marketplace_api: { status: 'error', error: 'Status check failed' },
         circuit_breaker: { state: 'unknown', failure_count: 0 }
-      };
+      },
+      rethrow: false
     }
-  },
+  ),
 
   /**
    * Search for plugins in the marketplace
    */
-  searchPlugins: async (params: SearchParams = {}): Promise<SearchResult> => {
-    try {
+  searchPlugins: withErrorHandling(
+    async (params: SearchParams = {}): Promise<SearchResult> => {
       const response = await api.get<SearchResult>('/marketplace/plugins', { 
         params,
         timeout: 30000  // 30 second timeout
@@ -137,75 +119,110 @@ export const marketplaceService = {
         per_page: data.per_page || params.per_page || 20,
         ...data  // Include any additional fields like error, fallback_used, etc.
       };
-    } catch (error) {
-      return handleApiError(error);
+    },
+    {
+      context: 'searchPlugins',
+      defaultValue: {
+        plugins: [],
+        total: 0,
+        page: 1,
+        per_page: 20
+      },
+      rethrow: false
     }
-  },
+  ),
 
   /**
    * Get detailed information about a specific plugin
    */
-  getPluginDetails: async (author: string, name: string): Promise<Plugin> => {
-    try {
+  getPluginDetails: withErrorHandling(
+    async (author: string, name: string): Promise<Plugin> => {
       const response = await api.get<Plugin>(`/marketplace/plugins/${author}/${name}`);
       return response.data;
-    } catch (error) {
-      return handleApiError(error);
+    },
+    {
+      context: 'getPluginDetails',
+      rethrow: true // Re-throw as this is likely a user action
     }
-  },
+  ),
 
   /**
    * Get all available versions for a plugin
    */
-  getPluginVersions: async (author: string, name: string): Promise<VersionsResult> => {
-    try {
+  getPluginVersions: withErrorHandling(
+    async (author: string, name: string): Promise<VersionsResult> => {
       const response = await api.get<VersionsResult>(
         `/marketplace/plugins/${author}/${name}/versions`
       );
       return response.data;
-    } catch (error) {
-      return handleApiError(error);
+    },
+    {
+      context: 'getPluginVersions',
+      defaultValue: { versions: [] },
+      rethrow: false
     }
-  },
+  ),
 
   /**
    * Get all available categories
    */
-  getCategories: async (): Promise<CategoriesResult> => {
-    try {
+  getCategories: withErrorHandling(
+    async (): Promise<CategoriesResult> => {
       const response = await api.get<CategoriesResult>('/marketplace/categories');
       return response.data;
-    } catch (error) {
-      return handleApiError(error);
+    },
+    {
+      context: 'getCategories',
+      defaultValue: { categories: [] },
+      rethrow: false
     }
-  },
+  ),
 
   /**
    * Get all unique authors
    */
-  getAuthors: async (): Promise<AuthorsResult> => {
-    try {
+  getAuthors: withErrorHandling(
+    async (): Promise<AuthorsResult> => {
       const response = await api.get<AuthorsResult>('/marketplace/authors');
       return response.data;
-    } catch (error) {
-      return handleApiError(error);
+    },
+    {
+      context: 'getAuthors',
+      defaultValue: { authors: [] },
+      rethrow: false
     }
-  },
+  ),
 
   /**
    * Get featured or recommended plugins
    */
-  getFeaturedPlugins: async (limit = 6): Promise<SearchResult> => {
-    try {
-      const response = await api.get<SearchResult>('/marketplace/plugins/featured', { 
-        params: { limit } 
-      });
-      return response.data;
-    } catch (error) {
-      // If featured endpoint doesn't exist, fallback to regular search
-      return marketplaceService.searchPlugins({ per_page: limit });
+  getFeaturedPlugins: withErrorHandling(
+    async (limit = 6): Promise<SearchResult> => {
+      try {
+        const response = await api.get<SearchResult>('/marketplace/plugins/featured', { 
+          params: { limit } 
+        });
+        return response.data;
+      } catch (error) {
+        // If featured endpoint doesn't exist, fallback to regular search
+        const apiError = toApiError(error);
+        if (apiError.status === 404) {
+          return marketplaceService.searchPlugins({ per_page: limit });
+        }
+        throw error;
+      }
+    },
+    {
+      context: 'getFeaturedPlugins',
+      defaultValue: {
+        plugins: [],
+        total: 0,
+        page: 1,
+        per_page: 6
+      },
+      rethrow: false
     }
-  },
+  ),
 };
 
 export default marketplaceService;

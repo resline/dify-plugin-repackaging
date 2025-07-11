@@ -1,0 +1,50 @@
+{
+  "default": {
+    "avg_response_time": 2000,
+    "p95_response_time": 5000,
+    "error_rate": 1.0,
+    "throughput": 10
+  },
+  "/api/v1/tasks/upload [small]": {
+    "avg_response_time": 1000,
+    "p95_response_time": 2000,
+    "error_rate": 0.5,
+    "throughput": 50
+  },
+  "/api/v1/tasks/upload [medium]": {
+    "avg_response_time": 5000,
+    "p95_response_time": 10000,
+    "error_rate": 1.0,
+    "throughput": 20
+  },
+  "/api/v1/tasks/upload [large]": {
+    "avg_response_time": 20000,
+    "p95_response_time": 40000,
+    "error_rate": 2.0,
+    "throughput": 5
+  },
+  "/api/v1/tasks [marketplace]": {
+    "avg_response_time": 500,
+    "p95_response_time": 1000,
+    "error_rate": 0.5,
+    "throughput": 100
+  },
+  "/api/v1/files/{file_id}/download": {
+    "avg_response_time": 1000,
+    "p95_response_time": 2000,
+    "error_rate": 0.5,
+    "throughput": 50
+  },
+  "/api/v1/files": {
+    "avg_response_time": 200,
+    "p95_response_time": 500,
+    "error_rate": 0.1,
+    "throughput": 200
+  },
+  "/api/v1/tasks/{task_id}": {
+    "avg_response_time": 100,
+    "p95_response_time": 200,
+    "error_rate": 0.1,
+    "throughput": 500
+  }
+}

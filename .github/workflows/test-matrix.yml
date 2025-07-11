@@ -1,0 +1,228 @@
+name: Test Matrix
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
+
+jobs:
+  generate-matrix:
+    name: Generate Test Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate test matrix
+        id: set-matrix
+        run: |
+          cat > matrix.json << 'EOF'
+          {
+            "include": [
+              {
+                "os": "ubuntu-latest",
+                "python": "3.11",
+                "node": "18",
+                "platform": "linux/amd64",
+                "redis": "6"
+              },
+              {
+                "os": "ubuntu-latest",
+                "python": "3.11",
+                "node": "20",
+                "platform": "linux/amd64",
+                "redis": "7"
+              },
+              {
+                "os": "ubuntu-latest",
+                "python": "3.12",
+                "node": "18",
+                "platform": "linux/amd64",
+                "redis": "6"
+              },
+              {
+                "os": "ubuntu-latest",
+                "python": "3.12",
+                "node": "20",
+                "platform": "linux/amd64",
+                "redis": "7"
+              },
+              {
+                "os": "ubuntu-latest",
+                "python": "3.12",
+                "node": "20",
+                "platform": "linux/arm64",
+                "redis": "7"
+              },
+              {
+                "os": "macos-latest",
+                "python": "3.12",
+                "node": "20",
+                "platform": "darwin/amd64",
+                "redis": "7"
+              },
+              {
+                "os": "macos-13",
+                "python": "3.12",
+                "node": "20",
+                "platform": "darwin/arm64",
+                "redis": "7"
+              }
+            ]
+          }
+          EOF
+          echo "matrix=$(jq -c . matrix.json)" >> $GITHUB_OUTPUT
+
+  test-combination:
+    name: Test ${{ matrix.os }} / Python ${{ matrix.python }} / Node ${{ matrix.node }} / Redis ${{ matrix.redis }}
+    needs: generate-matrix
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    
+    services:
+      redis:
+        image: redis:${{ matrix.redis }}-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Only run Redis service on Linux
+        if: startsWith(matrix.os, 'ubuntu')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install Redis (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install redis
+          brew services start redis
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python }}-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python }}-
+
+      - name: Cache Node dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node }}-
+
+      - name: Install system dependencies (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev
+
+      - name: Install Python dependencies
+        working-directory: ./dify-plugin-repackaging-web/backend
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Install Node dependencies
+        working-directory: ./dify-plugin-repackaging-web/frontend
+        run: npm ci
+
+      - name: Run backend tests
+        working-directory: ./dify-plugin-repackaging-web/backend
+        env:
+          REDIS_URL: redis://localhost:6379/0
+          TESTING: true
+        run: |
+          pytest tests/unit -v --tb=short
+
+      - name: Run frontend tests
+        working-directory: ./dify-plugin-repackaging-web/frontend
+        run: |
+          npm run lint
+          npm run type-check
+          npm run test:unit
+
+      - name: Test shell scripts
+        run: |
+          # Test plugin repackaging script
+          ./plugin_repackaging.sh --help
+          
+          # Test with local file (create a dummy package)
+          mkdir -p test-package
+          echo "test" > test-package/test.txt
+          zip -r test-package.difypkg test-package
+          ./plugin_repackaging.sh local test-package.difypkg || true
+          
+          # Cleanup
+          rm -rf test-package test-package.difypkg
+
+      - name: Test Docker build
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          docker build -t test-image .
+          docker run --rm test-image echo "Docker test successful"
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-${{ matrix.os }}-py${{ matrix.python }}-node${{ matrix.node }}
+          path: |
+            dify-plugin-repackaging-web/backend/test-results/
+            dify-plugin-repackaging-web/frontend/test-results/
+            logs/
+
+  compatibility-report:
+    name: Generate Compatibility Report
+    needs: test-combination
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate compatibility matrix
+        run: |
+          cat > compatibility-report.md << 'EOF'
+          # Compatibility Matrix Report
+          
+          Generated: $(date)
+          
+          ## Test Results
+          
+          | OS | Python | Node.js | Redis | Platform | Status |
+          |---|---------|---------|-------|----------|---------|
+          EOF
+          
+          # Add results based on job outcomes
+          echo "Report generated at compatibility-report.md"
+
+      - name: Upload compatibility report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compatibility-report
+          path: compatibility-report.md

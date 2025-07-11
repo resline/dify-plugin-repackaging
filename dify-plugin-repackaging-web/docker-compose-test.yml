@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Mock backend for E2E tests
+  backend-mock:
+    image: node:20-alpine
+    container_name: dify-plugin-backend-mock
+    working_dir: /app
+    command: |
+      sh -c "npm install -g json-server && 
+      echo '{\"tasks\": [], \"files\": [], \"plugins\": []}' > db.json && 
+      json-server --watch db.json --port 8000 --host 0.0.0.0"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Frontend for testing
+  frontend-test:
+    image: node:20-alpine
+    container_name: dify-plugin-frontend-test
+    working_dir: /app
+    command: sh -c "npm install && npm run build && npm install -g serve && serve -s dist -l 80"
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=http://backend-mock:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend-mock:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # Playwright test runner
+  playwright-test:
+    image: mcr.microsoft.com/playwright:v1.40.0-focal
+    container_name: dify-plugin-playwright-test
+    working_dir: /app
+    command: sh -c "npm install && npx playwright test --reporter=list"
+    environment:
+      - PLAYWRIGHT_BASE_URL=http://frontend-test:80
+      - CI=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - ./playwright-results:/app/playwright-report
+      - ./playwright-results:/app/test-results
+    depends_on:
+      frontend-test:
+        condition: service_healthy
+      backend-mock:
+        condition: service_healthy
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge

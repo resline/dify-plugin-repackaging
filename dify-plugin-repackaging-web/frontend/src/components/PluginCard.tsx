@@ -58,7 +58,9 @@ const PluginCard: React.FC<PluginCardProps> = ({
           setSelectedVersion(versionList[0].version || plugin.latest_version);
         }
       } catch (err) {
-        console.error('Error loading plugin versions:', err);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Error loading plugin versions:', err);
+        }
         setError('Failed to load versions');
         setVersions([]);
       } finally {

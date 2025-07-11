@@ -124,7 +124,7 @@ const Layout: React.FC<LayoutProps> = ({
 
         {/* Tab navigation - always visible */}
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-1" aria-label="Tabs">
+          <nav className="flex space-x-1" aria-label="Tabs" role="tablist">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = currentTab === tab.id;
@@ -133,6 +133,11 @@ const Layout: React.FC<LayoutProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => onTabChange(tab.id)}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`${tab.id}-tabpanel`}
+                  id={`${tab.id}-tab`}
+                  tabIndex={isActive ? 0 : -1}
                   className={`
                     group relative flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg
                     transition-all duration-200 ease-in-out
@@ -225,7 +230,13 @@ const Layout: React.FC<LayoutProps> = ({
       )}
 
       {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main 
+        className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
+        role="tabpanel"
+        id={`${currentTab}-tabpanel`}
+        aria-labelledby={`${currentTab}-tab`}
+        tabIndex={0}
+      >
         {children}
       </main>
 

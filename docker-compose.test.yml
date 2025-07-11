@@ -1,0 +1,156 @@
+version: '3.8'
+
+services:
+  # Test Database (Redis)
+  test-redis:
+    image: redis:7-alpine
+    container_name: dify-repack-test-redis
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - test-redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test Backend API
+  test-backend:
+    build: 
+      context: ./dify-plugin-repackaging-web/backend
+      dockerfile: Dockerfile
+    container_name: dify-repack-test-backend
+    environment:
+      - REDIS_URL=redis://test-redis:6379/0
+      - CELERY_BROKER_URL=redis://test-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://test-redis:6379/0
+      - BACKEND_CORS_ORIGINS=["http://localhost:3001","http://localhost:8001"]
+      - TEMP_DIR=/app/temp
+      - SCRIPTS_DIR=/app/scripts
+      - TESTING=true
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./temp-test:/app/temp
+      - ./dify-plugin-repackaging-web/backend/scripts:/app/scripts:ro
+      - ./dify-plugin-repackaging-web/backend:/app  # For hot reload during test development
+    depends_on:
+      test-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test Celery Worker
+  test-worker:
+    build: 
+      context: ./dify-plugin-repackaging-web/backend
+      dockerfile: Dockerfile
+    container_name: dify-repack-test-worker
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - REDIS_URL=redis://test-redis:6379/0
+      - CELERY_BROKER_URL=redis://test-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://test-redis:6379/0
+      - TEMP_DIR=/app/temp
+      - SCRIPTS_DIR=/app/scripts
+      - TESTING=true
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./temp-test:/app/temp
+      - ./dify-plugin-repackaging-web/backend/scripts:/app/scripts:ro
+      - ./dify-plugin-repackaging-web/backend:/app  # For hot reload during test development
+    depends_on:
+      test-redis:
+        condition: service_healthy
+      test-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.workers.celery_app", "inspect", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test Celery Beat (for scheduled tasks)
+  test-beat:
+    build: 
+      context: ./dify-plugin-repackaging-web/backend
+      dockerfile: Dockerfile
+    container_name: dify-repack-test-beat
+    command: celery -A app.workers.celery_app beat --loglevel=info
+    environment:
+      - REDIS_URL=redis://test-redis:6379/0
+      - CELERY_BROKER_URL=redis://test-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://test-redis:6379/0
+      - TESTING=true
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      test-redis:
+        condition: service_healthy
+      test-backend:
+        condition: service_healthy
+    networks:
+      - test-network
+
+  # Test Runner - Executes integration tests
+  test-runner:
+    build: 
+      context: ./dify-plugin-repackaging-web/backend
+      dockerfile: Dockerfile.test
+    container_name: dify-repack-test-runner
+    environment:
+      - REDIS_URL=redis://test-redis:6379/0
+      - CELERY_BROKER_URL=redis://test-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://test-redis:6379/0
+      - BACKEND_URL=http://test-backend:8000
+      - TESTING=true
+      - PYTHONPATH=/app
+    volumes:
+      - ./dify-plugin-repackaging-web/backend:/app
+      - ./temp-test:/app/temp
+      - ./test-results:/app/test-results
+    depends_on:
+      test-redis:
+        condition: service_healthy
+      test-backend:
+        condition: service_healthy
+      test-worker:
+        condition: service_healthy
+    networks:
+      - test-network
+    command: pytest -v --color=yes --tb=short /app/tests/integration
+
+  # Mock External Services
+  mock-services:
+    build:
+      context: ./testing/mock-services
+      dockerfile: Dockerfile
+    container_name: dify-repack-mock-services
+    ports:
+      - "8002:8000"
+    environment:
+      - MOCK_MARKETPLACE_URL=http://mock-services:8000/marketplace
+      - MOCK_GITHUB_URL=http://mock-services:8000/github
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+volumes:
+  test-redis-data:
+
+networks:
+  test-network:
+    driver: bridge

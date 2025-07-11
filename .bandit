@@ -1,0 +1,22 @@
+# Bandit configuration file
+[bandit]
+exclude_dirs = [
+    'tests',
+    'venv',
+    '.venv',
+    'node_modules',
+    '.git',
+    '__pycache__',
+    '.pytest_cache'
+]
+
+skips = [
+    # Skip specific test IDs if needed
+    # B101,  # assert_used
+    # B601,  # paramiko_calls
+]
+
+# Test specific configurations
+[bandit.plugins]
+# B201: flask_debug_true
+flask_debug_true = {check_typed_expressions = true}

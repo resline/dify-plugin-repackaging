@@ -132,6 +132,14 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
   const fetchTaskStatus = async () => {
     try {
       const data = await taskService.getTaskStatus(taskId);
+      
+      // Handle null response (task not found or error)
+      if (!data) {
+        addLogEntry('warning', 'Task not found or server error', 'The task may have expired or the server is temporarily unavailable');
+        // Don't set task to null to avoid losing UI state
+        return;
+      }
+      
       setTask(data);
       
       // Add initial log entry if this is the first fetch
@@ -157,7 +165,8 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
       }
     } catch (error: any) {
       console.error('Error fetching task status:', error);
-      addLogEntry('error', 'Failed to fetch task status', error.message);
+      addLogEntry('error', 'Failed to fetch task status', error.message || 'Network error');
+      // Don't throw - gracefully handle the error
     }
   };
 

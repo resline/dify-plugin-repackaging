@@ -7,6 +7,7 @@ import { taskService } from './services/api';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastContainer, useToast } from './components/Toast';
 import useDeepLink from './hooks/useDeepLink';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppContent() {
   const { toasts, success, error, removeToast } = useToast();
@@ -33,31 +34,42 @@ function AppContent() {
 
   // Handle deep link data
   useEffect(() => {
-    if (deepLinkData && !currentTask) {
-      if (deepLinkData.type === 'url') {
-        setCurrentTab('url');
-        setInitialUrl(deepLinkData.url);
-        // Auto-submit if it's a valid marketplace URL or .difypkg file
-        if (deepLinkData.url.endsWith('.difypkg') || deepLinkData.url.includes('marketplace.dify.ai/plugins/')) {
-          handleSubmit({
-            url: deepLinkData.url,
+    // Prevent execution if component is unmounting or during initial render
+    let isMounted = true;
+    const timeoutId = setTimeout(() => {
+      if (!isMounted) return;
+      
+      if (deepLinkData && !currentTask) {
+        if (deepLinkData.type === 'url') {
+          setCurrentTab('url');
+          setInitialUrl(deepLinkData.url);
+          // Auto-submit if it's a valid marketplace URL or .difypkg file
+          if (deepLinkData.url.endsWith('.difypkg') || deepLinkData.url.includes('marketplace.dify.ai/plugins/')) {
+            handleSubmit({
+              url: deepLinkData.url,
+              platform: '',
+              suffix: 'offline'
+            });
+          }
+        } else if (deepLinkData.type === 'marketplace') {
+          setCurrentTab('marketplace');
+          // Auto-submit marketplace plugin
+          handleMarketplaceSubmit({
+            author: deepLinkData.author,
+            name: deepLinkData.name,
+            version: deepLinkData.version === 'latest' ? undefined : deepLinkData.version,
             platform: '',
             suffix: 'offline'
           });
         }
-      } else if (deepLinkData.type === 'marketplace') {
-        setCurrentTab('marketplace');
-        // Auto-submit marketplace plugin
-        handleMarketplaceSubmit({
-          author: deepLinkData.author,
-          name: deepLinkData.name,
-          version: deepLinkData.version === 'latest' ? undefined : deepLinkData.version,
-          platform: '',
-          suffix: 'offline'
-        });
       }
-    }
-  }, [deepLinkData]);
+    }, 100); // Small delay to ensure component is fully mounted
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [deepLinkData, currentTask, handleSubmit, handleMarketplaceSubmit]);
 
   const handleSubmit = async (formData) => {
     setIsLoading(true);
@@ -71,10 +83,12 @@ function AppContent() {
       
       setCurrentTask(task);
       success('Task created successfully!');
-    } catch (error) {
-      console.error('Error creating task:', error);
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error creating task:', err);
+      }
       error(
-        error.response?.data?.detail || 'Failed to create task. Please try again.'
+        err.response?.data?.detail || 'Failed to create task. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -96,7 +110,9 @@ function AppContent() {
       setCurrentTask(task);
       success('Marketplace task created successfully!');
     } catch (err) {
-      console.error('Error creating marketplace task:', err);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error creating marketplace task:', err);
+      }
       error(
         err.response?.data?.detail || 'Failed to create task. Please try again.'
       );
@@ -137,7 +153,9 @@ function AppContent() {
       setCurrentTask(task);
       success('File upload task created successfully!');
     } catch (err) {
-      console.error('Error creating file upload task:', err);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error creating file upload task:', err);
+      }
       const errorMessage = err.response?.data?.detail || 
                           err.message || 
                           'Failed to upload file. Please try again.';
@@ -258,9 +276,11 @@ function AppContent() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

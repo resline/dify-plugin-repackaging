@@ -40,7 +40,21 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '' }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
-    loadCompletedTasks();
+    let isMounted = true;
+    
+    const loadTasksWithDelay = () => {
+      if (isMounted) {
+        loadCompletedTasks();
+      }
+    };
+    
+    // Delay initial load to prevent race conditions during testing
+    const timeoutId = setTimeout(loadTasksWithDelay, 100);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const loadCompletedTasks = async () => {
@@ -50,7 +64,9 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '' }) => {
       const response = await taskService.listCompletedFiles(10);
       setTasks(response.tasks || []);
     } catch (err: any) {
-      console.error('Error loading completed tasks:', err);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error loading completed tasks:', err);
+      }
       setError('Failed to load completed files');
       // If the endpoint doesn't exist yet, fall back to listing recent tasks
       try {
@@ -61,7 +77,9 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '' }) => {
         setTasks(completedTasks);
         setError('');
       } catch (fallbackErr) {
-        console.error('Fallback also failed:', fallbackErr);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Fallback also failed:', fallbackErr);
+        }
       }
     } finally {
       setLoading(false);

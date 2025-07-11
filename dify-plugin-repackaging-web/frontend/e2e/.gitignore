@@ -1,0 +1,24 @@
+# Test artifacts
+test-data/
+downloads/
+screenshots/
+*.png
+*.jpg
+*.jpeg
+
+# Playwright artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Traces
+*.zip
+trace/
+
+# Temporary files
+*.tmp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
