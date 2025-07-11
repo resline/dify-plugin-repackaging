@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Link, Store, File, ChevronLeft, Plus, Command, FolderOpen } from 'lucide-react';
+import useAppStore from '../stores/appStore';
 
 const Layout = ({ 
   children, 
@@ -50,6 +51,8 @@ const Layout = ({
     { id: 'file', label: 'Upload File', icon: File, shortcut: '3' },
     { id: 'completed', label: 'Completed Files', icon: FolderOpen, shortcut: '4' }
   ];
+
+  const { isSidebarOpen } = useAppStore();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -204,15 +207,19 @@ const Layout = ({
         </div>
       )}
 
-      {/* Main content */}
+      {/* Main content with sidebar padding */}
       <main 
-        className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
-        role="tabpanel"
-        id={`${currentTab}-tabpanel`}
-        aria-labelledby={`${currentTab}-tab`}
-        tabIndex={0}
+        className={`transition-all duration-300 ${isSidebarOpen ? 'lg:mr-80' : ''}`}
       >
-        {children}
+        <div
+          className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
+          role="tabpanel"
+          id={`${currentTab}-tabpanel`}
+          aria-labelledby={`${currentTab}-tab`}
+          tabIndex={0}
+        >
+          {children}
+        </div>
       </main>
 
       {/* Footer */}

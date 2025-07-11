@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Copy, Check, Terminal, Info, AlertCircle, XCircle, Loader } from 'lucide-react';
+import { Copy, Check, Terminal, Info, AlertCircle, XCircle, Loader, CheckCircle, Clock, Zap } from 'lucide-react';
 import type { LogEntry, LogViewerProps } from '../types/logger';
+
+// Track command execution states
+interface CommandState {
+  startTime: Date;
+  endTime?: Date;
+  status: 'running' | 'completed' | 'failed' | 'queued';
+}
 
 const LogViewer: React.FC<LogViewerProps> = ({
   logs,
@@ -15,6 +22,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [copied, setCopied] = useState(false);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [commandStates, setCommandStates] = useState<Record<string, CommandState>>({});
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
@@ -64,9 +72,82 @@ const LogViewer: React.FC<LogViewerProps> = ({
     }
   };
 
-  // Get icon for log level
-  const getLogIcon = (level: LogEntry['level']) => {
-    switch (level) {
+  // Update command states based on log entries
+  useEffect(() => {
+    const newCommandStates = { ...commandStates };
+    let hasChanges = false;
+
+    logs.forEach((log) => {
+      // Detect command start
+      if (log.message.includes('Running command:') || log.message.includes('Executing:')) {
+        const commandId = log.id;
+        if (!newCommandStates[commandId]) {
+          newCommandStates[commandId] = {
+            startTime: log.timestamp,
+            status: 'running'
+          };
+          hasChanges = true;
+        }
+      }
+      
+      // Detect command completion
+      if (log.message.includes('Command completed') || log.message.includes('✓') || log.level === 'success') {
+        const commandId = findRelatedCommandId(log, logs);
+        if (commandId && newCommandStates[commandId]) {
+          newCommandStates[commandId].endTime = log.timestamp;
+          newCommandStates[commandId].status = 'completed';
+          hasChanges = true;
+        }
+      }
+      
+      // Detect command failure
+      if (log.level === 'error' || log.message.includes('failed') || log.message.includes('✗')) {
+        const commandId = findRelatedCommandId(log, logs);
+        if (commandId && newCommandStates[commandId]) {
+          newCommandStates[commandId].endTime = log.timestamp;
+          newCommandStates[commandId].status = 'failed';
+          hasChanges = true;
+        }
+      }
+    });
+
+    if (hasChanges) {
+      setCommandStates(newCommandStates);
+    }
+  }, [logs]);
+
+  // Helper to find related command ID
+  const findRelatedCommandId = (log: LogEntry, allLogs: LogEntry[]): string | null => {
+    const index = allLogs.findIndex(l => l.id === log.id);
+    // Look backwards for the most recent command
+    for (let i = index - 1; i >= 0; i--) {
+      if (allLogs[i].message.includes('Running command:') || allLogs[i].message.includes('Executing:')) {
+        return allLogs[i].id;
+      }
+    }
+    return null;
+  };
+
+  // Get icon for log level with command state awareness
+  const getLogIcon = (log: LogEntry) => {
+    const commandState = commandStates[log.id];
+    
+    // If this is a command, show status-based icon
+    if (commandState) {
+      switch (commandState.status) {
+        case 'running':
+          return <Zap className="h-4 w-4 text-yellow-400 animate-pulse" />;
+        case 'completed':
+          return <CheckCircle className="h-4 w-4 text-green-400" />;
+        case 'failed':
+          return <XCircle className="h-4 w-4 text-red-400" />;
+        case 'queued':
+          return <Clock className="h-4 w-4 text-gray-400" />;
+      }
+    }
+    
+    // Otherwise, use standard icons
+    switch (log.level) {
       case 'info':
         return <Info className="h-4 w-4 text-blue-400" />;
       case 'warning':
@@ -74,7 +155,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
       case 'error':
         return <XCircle className="h-4 w-4 text-red-400" />;
       case 'success':
-        return <Check className="h-4 w-4 text-green-400" />;
+        return <CheckCircle className="h-4 w-4 text-green-400" />;
       case 'processing':
         return <Loader className="h-4 w-4 text-indigo-400 animate-spin" />;
       default:
@@ -182,7 +263,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
                     index === logs.length - 1 ? 'animate-pulse-once' : ''
                   }`}
                 >
-                  {getLogIcon(log.level)}
+                  {getLogIcon(log)}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2">
                       {showTimestamps && (
@@ -190,9 +271,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
                           [{log.timestamp.toLocaleTimeString()}]
                         </span>
                       )}
-                      <p className={`flex-1 break-words whitespace-pre-wrap ${getLogColor(log.level)}`}>
-                        {log.message}
-                      </p>
+                      <div className="flex-1">
+                        <p className={`break-words whitespace-pre-wrap ${getLogColor(log.level)}`}>
+                          {log.message}
+                        </p>
+                        {/* Show execution time for completed commands */}
+                        {commandStates[log.id]?.endTime && (
+                          <p className="text-xs opacity-50 mt-1">
+                            Execution time: {getExecutionTime(commandStates[log.id])}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     {log.details && (
                       <pre className="mt-1 text-xs opacity-75 whitespace-pre-wrap break-words pl-6">
@@ -225,6 +314,15 @@ const LogViewer: React.FC<LogViewerProps> = ({
       </div>
     </div>
   );
+};
+
+// Helper to format execution time
+const getExecutionTime = (commandState: CommandState): string => {
+  if (!commandState.endTime) return '';
+  const duration = commandState.endTime.getTime() - commandState.startTime.getTime();
+  if (duration < 1000) return `${duration}ms`;
+  if (duration < 60000) return `${(duration / 1000).toFixed(1)}s`;
+  return `${Math.floor(duration / 60000)}m ${Math.floor((duration % 60000) / 1000)}s`;
 };
 
 export default LogViewer;

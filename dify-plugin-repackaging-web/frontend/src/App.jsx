@@ -3,34 +3,40 @@ import Layout from './components/Layout';
 import UploadForm from './components/UploadForm';
 import TaskStatus from './components/TaskStatus';
 import CompletedFiles from './components/CompletedFiles';
+import MarketplaceBrowser from './components/MarketplaceBrowser';
+import Sidebar from './components/Sidebar';
+import ProcessingPanel from './components/ProcessingPanel';
 import { taskService } from './services/api';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastContainer, useToast } from './components/Toast';
 import useDeepLink from './hooks/useDeepLink';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import useAppStore from './stores/appStore';
 
 function AppContent() {
   const { toasts, success, error, removeToast } = useToast();
   const deepLinkData = useDeepLink();
-  const [currentTask, setCurrentTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [initialUrl, setInitialUrl] = useState('');
-  const [currentTab, setCurrentTab] = useState(() => {
-    // Check for deep link data first
-    if (deepLinkData?.type === 'marketplace') {
-      return 'marketplace';
-    }
-    // Otherwise restore last selected tab from localStorage
-    const savedTab = localStorage.getItem('lastSelectedTab');
-    // Ensure saved tab is valid
-    const validTabs = ['url', 'marketplace', 'file', 'completed'];
-    return (savedTab && validTabs.includes(savedTab)) ? savedTab : 'url';
-  });
-
-  // Save tab selection to localStorage
+  
+  // Use global state from Zustand
+  const { 
+    currentTask, 
+    setCurrentTask, 
+    currentTab, 
+    setCurrentTab,
+    formState,
+    setFormState 
+  } = useAppStore();
+  
+  // Initialize tab from deep link if needed
   useEffect(() => {
-    localStorage.setItem('lastSelectedTab', currentTab);
-  }, [currentTab]);
+    if (deepLinkData?.type === 'marketplace' && currentTab !== 'marketplace') {
+      setCurrentTab('marketplace');
+    }
+  }, [deepLinkData, currentTab, setCurrentTab]);
+
+  // Form state is now persisted via Zustand, no need for localStorage here
 
   const handleSubmit = useCallback(async (formData) => {
     setIsLoading(true);
@@ -180,6 +186,11 @@ function AppContent() {
   const handleTabChange = (tabId) => {
     setCurrentTab(tabId);
   };
+  
+  // Persist form state changes
+  const updateFormState = (updates) => {
+    setFormState(updates);
+  };
 
   return (
     <>
@@ -188,21 +199,29 @@ function AppContent() {
       <Layout
         currentTab={currentTab}
         onTabChange={handleTabChange}
-        isProcessing={!!currentTask}
+        isProcessing={false}
         onNewTask={handleNewTask}
-        showBackButton={!!currentTask}
+        showBackButton={false}
       >
         <div className="space-y-6">
-          {!currentTask && currentTab !== 'completed' && (
-            <CompletedFiles />
-          )}
+          {/* Sidebar for completed files */}
+          <Sidebar />
           
           {currentTab === 'completed' && !currentTask ? (
             <CompletedFiles refreshInterval={30} />
-          ) : (
+          ) : currentTab === 'marketplace' && !currentTask ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 md:p-8">
-              {!currentTask ? (
-            <>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
+                Browse Dify Marketplace
+              </h2>
+              <MarketplaceBrowser
+                onSelectPlugin={handleMarketplaceSubmit}
+                platform={formState.platform}
+                suffix={formState.suffix}
+              />
+            </div>
+          ) : currentTab !== 'marketplace' ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 md:p-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
                 Repackage a Dify Plugin
               </h2>
@@ -252,21 +271,17 @@ function AppContent() {
                   <li>• Local .difypkg files (upload from your computer)</li>
                 </ul>
               </div>
-            </>
-          ) : (
-            <>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
-                Processing Task
-              </h2>
-              <TaskStatus
-                taskId={currentTask.task_id}
-                onComplete={handleTaskComplete}
-                onError={handleTaskError}
-                onNewTask={handleNewTask}
-              />
-            </>
-          )}
             </div>
+          ) : null}
+          
+          {/* Processing panel - shown as overlay when task is active */}
+          {currentTask && (
+            <ProcessingPanel
+              taskId={currentTask.task_id}
+              onComplete={handleTaskComplete}
+              onError={handleTaskError}
+              onNewTask={handleNewTask}
+            />
           )}
         </div>
       </Layout>

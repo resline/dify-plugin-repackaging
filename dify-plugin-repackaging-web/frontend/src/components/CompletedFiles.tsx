@@ -31,9 +31,11 @@ interface CompletedTask {
 
 interface CompletedFilesProps {
   className?: string;
+  refreshInterval?: number;
+  showCompact?: boolean;
 }
 
-const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '' }) => {
+const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '', refreshInterval, showCompact = false }) => {
   const [tasks, setTasks] = useState<CompletedTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,6 +43,7 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '' }) => {
 
   useEffect(() => {
     let isMounted = true;
+    let intervalId: NodeJS.Timeout | null = null;
     
     const loadTasksWithDelay = () => {
       if (isMounted) {
@@ -51,11 +54,23 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '' }) => {
     // Delay initial load to prevent race conditions during testing
     const timeoutId = setTimeout(loadTasksWithDelay, 100);
     
+    // Set up refresh interval if specified
+    if (refreshInterval && refreshInterval > 0) {
+      intervalId = setInterval(() => {
+        if (isMounted) {
+          loadCompletedTasks();
+        }
+      }, refreshInterval * 1000);
+    }
+    
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
-  }, []);
+  }, [refreshInterval]);
 
   const loadCompletedTasks = async () => {
     try {
@@ -123,6 +138,70 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '' }) => {
     );
   }
 
+  if (showCompact) {
+    // Compact mode for sidebar
+    return (
+      <div className={className}>
+        {loading ? (
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-4">
+            <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+            <button
+              onClick={loadCompletedTasks}
+              className="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+            >
+              Try again
+            </button>
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="text-center py-8">
+            <Package className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">No completed files</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {tasks.map((task) => {
+              const pluginInfo = getPluginInfo(task);
+              return (
+                <div
+                  key={task.task_id}
+                  className="p-2 bg-gray-50 dark:bg-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0 mr-2">
+                      <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {pluginInfo?.name || task.output_filename || 'Plugin'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatDate(task.completed_at)}
+                      </p>
+                    </div>
+                    <a
+                      href={task.download_url}
+                      download
+                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded transition-all"
+                      title="Download"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Regular mode
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
