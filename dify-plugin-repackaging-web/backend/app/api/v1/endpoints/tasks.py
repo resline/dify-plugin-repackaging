@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse
 from app.models.task import TaskCreate, TaskResponse, TaskStatus, MarketplaceTaskCreate
 from app.workers.celery_app import process_repackaging, process_marketplace_repackaging, redis_client
