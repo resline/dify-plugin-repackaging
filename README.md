@@ -1,6 +1,17 @@
 ## Dify 1.0 Plugin Downloading and Repackaging
 
 > **⚠️ Important Notice**: Dify Marketplace search/listing API is currently unavailable due to recent changes. However, direct plugin downloads still work if you know the plugin author, name, and version. For plugin discovery, please use the [Dify Marketplace website](https://marketplace.dify.ai) or GitHub releases.
+
+## Badges
+
+![CI/CD](https://github.com/resline/dify-plugin-repackaging/workflows/CI%2FCD%20Pipeline/badge.svg)
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen)
+![Coverage](https://codecov.io/gh/resline/dify-plugin-repackaging/branch/main/graph/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+![Node](https://img.shields.io/badge/node-18%20%7C%2020-green)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
+![License](https://img.shields.io/github/license/resline/dify-plugin-repackaging)
+
 ### How To Use With Docker
 
 1.change param in dockerfile
