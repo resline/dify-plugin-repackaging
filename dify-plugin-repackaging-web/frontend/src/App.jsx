@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from './components/Layout';
 import UploadForm from './components/UploadForm';
 import TaskStatus from './components/TaskStatus';
@@ -31,6 +31,56 @@ function AppContent() {
   useEffect(() => {
     localStorage.setItem('lastSelectedTab', currentTab);
   }, [currentTab]);
+
+  const handleSubmit = useCallback(async (formData) => {
+    setIsLoading(true);
+    
+    try {
+      const task = await taskService.createTask(
+        formData.url,
+        formData.platform,
+        formData.suffix
+      );
+      
+      setCurrentTask(task);
+      success('Task created successfully!');
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error creating task:', err);
+      }
+      error(
+        err.response?.data?.detail || 'Failed to create task. Please try again.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [success, error]);
+
+  const handleMarketplaceSubmit = useCallback(async (pluginData) => {
+    setIsLoading(true);
+    
+    try {
+      const task = await taskService.createMarketplaceTask(
+        pluginData.author,
+        pluginData.name,
+        pluginData.version,
+        pluginData.platform,
+        pluginData.suffix
+      );
+      
+      setCurrentTask(task);
+      success('Marketplace task created successfully!');
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error creating marketplace task:', err);
+      }
+      error(
+        err.response?.data?.detail || 'Failed to create task. Please try again.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [success, error]);
 
   // Handle deep link data
   useEffect(() => {
@@ -70,56 +120,6 @@ function AppContent() {
       clearTimeout(timeoutId);
     };
   }, [deepLinkData, currentTask, handleSubmit, handleMarketplaceSubmit]);
-
-  const handleSubmit = async (formData) => {
-    setIsLoading(true);
-    
-    try {
-      const task = await taskService.createTask(
-        formData.url,
-        formData.platform,
-        formData.suffix
-      );
-      
-      setCurrentTask(task);
-      success('Task created successfully!');
-    } catch (err) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('Error creating task:', err);
-      }
-      error(
-        err.response?.data?.detail || 'Failed to create task. Please try again.'
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleMarketplaceSubmit = async (pluginData) => {
-    setIsLoading(true);
-    
-    try {
-      const task = await taskService.createMarketplaceTask(
-        pluginData.author,
-        pluginData.name,
-        pluginData.version,
-        pluginData.platform,
-        pluginData.suffix
-      );
-      
-      setCurrentTask(task);
-      success('Marketplace task created successfully!');
-    } catch (err) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('Error creating marketplace task:', err);
-      }
-      error(
-        err.response?.data?.detail || 'Failed to create task. Please try again.'
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleFileSubmit = async (fileData) => {
     // Validate fileData
