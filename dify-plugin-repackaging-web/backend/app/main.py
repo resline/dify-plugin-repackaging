@@ -71,6 +71,7 @@ app.include_router(v1_files.router, prefix=settings.API_V1_STR)
 @app.on_event("startup")
 async def startup_event():
     """Create necessary directories on startup"""
+    logger = logging.getLogger(__name__)
     try:
         os.makedirs(settings.TEMP_DIR, exist_ok=True)
         logger.info(f"Created temp directory: {settings.TEMP_DIR}")
