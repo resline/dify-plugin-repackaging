@@ -11,35 +11,57 @@ export const useDeepLink = () => {
     // Parse URL parameters
     const params = new URLSearchParams(window.location.search);
     
-    // Check for marketplace plugin parameters
-    const pluginUrl = params.get('plugin');
-    const author = params.get('author');
-    const name = params.get('name');
-    const version = params.get('version');
+    // Check for URL parameter first
+    const url = params.get('url');
     
-    let hasData = false;
-    
-    if (pluginUrl) {
-      // Handle full plugin URL parameter
-      setDeepLinkData({
-        type: 'url',
-        url: pluginUrl
-      });
-      hasData = true;
-    } else if (author && name) {
-      // Handle individual plugin parameters
-      setDeepLinkData({
-        type: 'marketplace',
-        author,
-        name,
-        version: version || 'latest'
-      });
-      hasData = true;
-    }
-    
-    // Clear URL parameters after processing to avoid confusion
-    if (hasData) {
+    if (url) {
+      // Validate URL
+      try {
+        new URL(url);
+      } catch {
+        // Invalid URL
+        return;
+      }
+
+      // Check if it's a marketplace URL
+      const marketplaceMatch = url.match(/^https:\/\/marketplace\.dify\.ai\/plugins\/([^\/]+)\/([^\/]+)\/?(?:([^\/]+)\/?)?$/);
+      
+      if (marketplaceMatch) {
+        const [, author, name, version] = marketplaceMatch;
+        setDeepLinkData({
+          type: 'marketplace',
+          url,
+          author,
+          name,
+          version: version || null
+        });
+      } else {
+        // Direct URL (GitHub releases, .difypkg files, etc.)
+        setDeepLinkData({
+          type: 'url',
+          url
+        });
+      }
+      
+      // Clear URL parameters after processing
       window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      // Check for individual marketplace plugin parameters (legacy support)
+      const author = params.get('author');
+      const name = params.get('name');
+      const version = params.get('version');
+      
+      if (author && name) {
+        setDeepLinkData({
+          type: 'marketplace',
+          author,
+          name,
+          version: version || 'latest'
+        });
+        
+        // Clear URL parameters after processing
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
   }, []);
 

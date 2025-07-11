@@ -65,8 +65,17 @@ app.include_router(v1_marketplace.router, prefix=settings.API_V1_STR)
 app.include_router(v1_tasks.router, prefix=settings.API_V1_STR)
 app.include_router(v1_files.router, prefix=settings.API_V1_STR)
 
-# Create necessary directories
-os.makedirs(settings.TEMP_DIR, exist_ok=True)
+# Directory creation moved to startup event to avoid permission issues during import
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Create necessary directories on startup"""
+    try:
+        os.makedirs(settings.TEMP_DIR, exist_ok=True)
+        logger.info(f"Created temp directory: {settings.TEMP_DIR}")
+    except Exception as e:
+        logger.warning(f"Could not create temp directory {settings.TEMP_DIR}: {e}")
 
 
 @app.middleware("http")
