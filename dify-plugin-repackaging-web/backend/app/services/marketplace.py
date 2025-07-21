@@ -134,6 +134,26 @@ class MarketplaceService:
             # Try multiple API endpoints in order
             api_attempts = [
                 {
+                    "url": "https://marketplace.dify.ai/api/v1/plugins/search/advanced",
+                    "method": "POST",
+                    "json": {
+                        "page": page,
+                        "page_size": per_page,
+                        "query": query or "",
+                        "sort_by": "install_count",
+                        "sort_order": "DESC",
+                        "category": category or "",
+                        "tags": [],
+                        "type": "plugin"
+                    },
+                    "transformer": lambda r: {
+                        "plugins": r.get("data", r.get("plugins", [])),
+                        "total": r.get("total", len(r.get("data", r.get("plugins", [])))),
+                        "page": page,
+                        "per_page": per_page
+                    }
+                },
+                {
                     "url": "https://marketplace.dify.ai/api/v1/plugins",
                     "method": "GET",
                     "params": params,
