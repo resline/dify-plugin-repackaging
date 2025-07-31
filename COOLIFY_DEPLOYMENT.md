@@ -1,35 +1,181 @@
-# Coolify Deployment Guide
+# Coolify Deployment Guide - Kompletna Instrukcja
 
-## Environment Variables
+## 🚀 Przegląd Wdrożenia
 
-When deploying on Coolify, make sure to set the following environment variables:
+Ta aplikacja obsługuje **trzy różne sposoby wdrożenia** na Coolify. Wybierz wariant najlepszy dla Twoich potrzeb:
 
-### Required Variables
+### 1. **All-in-One (Zalecane)** - `docker-compose.coolify-aio.yml`
+- ✅ Najprostsze wdrożenie - jeden kontener
+- ✅ Supervisor zarządza wszystkimi procesami
+- ✅ Idealny dla małych/średnich aplikacji
+- ⚡ Szybszy start
 
-```bash
-# Backend CORS configuration
-# Option 1: Simple comma-separated list (recommended)
-BACKEND_CORS_ORIGINS=https://dify-plugin.resline.net
+### 2. **Multi-Service** - `docker-compose.coolify.yml`
+- ✅ Skalowalna architektura mikroserwisów
+- ✅ Każdy komponent w osobnym kontenerze
+- ✅ Lepsze dla dużych aplikacji
+- ⚠️ Wymaga więcej zasobów
 
-# Option 2: Multiple domains
-BACKEND_CORS_ORIGINS=https://dify-plugin.resline.net,https://another-domain.com
+### 3. **Simplified** - `docker-compose.coolify-simple.yml`
+- ✅ Bardzo uproszczona wersja
+- ✅ Minimalny footprint
+- ⚠️ Ograniczona funkcjonalność
 
-# Option 3: JSON array (make sure it's properly formatted)
-BACKEND_CORS_ORIGINS=["https://dify-plugin.resline.net"]
+---
+
+## 📋 Krok-po-Kroku: Wdrożenie All-in-One (Zalecane)
+
+### 1. **Utwórz Aplikację w Coolify**
+1. **Projects** → wybierz projekt → **+ New** → **Resource**
+2. Wybierz **Docker Compose**
+3. **Repository**: URL Twojego repo
+4. **Branch**: `main` (lub aktualny branch)
+5. **Docker Compose Location**: `dify-plugin-repackaging-web/docker-compose.coolify-aio.yml`
+
+### 2. **Konfiguracja Domeny**
+```
+⚠️ WAŻNE: Ustaw domenę TYLKO dla głównej aplikacji!
+
+✅ Domains for Main App: https://dify-plugin.twoja-domena.pl
+❌ Domains for Backend: ZOSTAW PUSTE
+❌ Domains for Worker: ZOSTAW PUSTE  
+❌ Domains for Celery Beat: ZOSTAW PUSTE
+❌ Domains for Frontend: ZOSTAW PUSTE
+❌ Domains for Nginx: ZOSTAW PUSTE
 ```
 
-### Optional Variables
+### 3. **Zmienne Środowiskowe**
 
+#### Wymagane:
 ```bash
-# Rate limiting (default: 10 requests per minute)
+# CORS - KRYTYCZNE! Ustaw swoją domenę
+BACKEND_CORS_ORIGINS=https://dify-plugin.twoja-domena.pl
+```
+
+#### Opcjonalne:
+```bash
+# Limity i optymalizacje
 RATE_LIMIT_PER_MINUTE=10
-
-# File retention (default: 24 hours)
 FILE_RETENTION_HOURS=24
-
-# Maximum file size in bytes (default: 500MB)
 MAX_FILE_SIZE=524288000
+
+# Tylko dla wersji multi-service
+COMPOSE_PROJECT_NAME=dify-plugin-repackaging
 ```
+
+### 4. **Ustawienia Sieci**
+- **Port**: 80 (automatycznie wystawiony)
+- **SSL**: Włącz **Force HTTPS** + **Let's Encrypt**
+- **Health Check Path**: `/health`
+
+### 5. **Deploy i Weryfikacja**
+1. Kliknij **Deploy**
+2. Obserwuj logi w zakładce **Logs**
+3. Po zakończeniu sprawdź: `https://twoja-domena.pl/health`
+
+---
+
+## 🔧 Konfiguracja Multi-Service (Zaawansowane)
+
+### Plik: `docker-compose.coolify.yml`
+
+#### Zmienne Środowiskowe:
+```bash
+# Wymagane
+BACKEND_CORS_ORIGINS=https://twoja-domena.pl
+COMPOSE_PROJECT_NAME=dify-plugin-repackaging
+
+# Opcjonalne
+RATE_LIMIT_PER_MINUTE=10
+FILE_RETENTION_HOURS=24
+```
+
+#### Architektura Serwisów:
+```
+┌─────────────┐  Port 80   ┌─────────────┐
+│    nginx    │◄──────────►│   Coolify   │
+│ (public)    │            │   Traefik   │
+└─────────────┘            └─────────────┘
+       │
+       ▼ (internal network)
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   backend   │    │   worker    │    │ celery-beat │
+│  (port 8000)│    │ (no ports)  │    │ (no ports)  │  
+└─────────────┘    └─────────────┘    └─────────────┘
+       │                   │                   │
+       └───────────────────┼───────────────────┘
+                           ▼
+                   ┌─────────────┐
+                   │    redis    │
+                   │ (port 6379) │
+                   └─────────────┘
+```
+
+---
+
+## 🚨 Troubleshooting - Najczęstsze Problemy
+
+### Problem: Błąd CORS
+```
+Access to XMLHttpRequest blocked by CORS policy
+```
+**Rozwiązanie:**
+```bash
+# ✅ Poprawny format
+BACKEND_CORS_ORIGINS=https://twoja-domena.pl
+
+# ❌ Błędny format - unikaj
+BACKEND_CORS_ORIGINS=[""]  # pusty JSON
+BACKEND_CORS_ORIGINS=http://twoja-domena.pl  # brak HTTPS
+```
+
+### Problem: 502 Bad Gateway
+**Przyczyny i rozwiązania:**
+1. **Backend nie startuje** - sprawdź logi aplikacji
+2. **Redis nie działa** - sprawdź connection string
+3. **Network issues** - sprawdź czy wszystkie serwisy są w tej samej sieci
+4. **Czas startu** - poczekaj 1-2 minuty na pełny start
+
+### Problem: Nginx Config Mount Error
+```
+error mounting nginx.conf to rootfs
+```
+**Rozwiązanie:** Upewnij się, że używasz:
+- `docker-compose.coolify-aio.yml` (wszystko w jednym kontenerze)
+- LUB `docker-compose.coolify.yml` (nginx build z Dockerfile)
+
+### Problem: WebSocket nie działa
+**Rozwiązanie:**
+1. Sprawdź czy używasz HTTPS (nie HTTP)
+2. Coolify automatycznie obsługuje WebSocket headers
+3. Upewnij się, że nginx ma prawidłową konfigurację proxy
+
+### Problem: Zadania Celery nie wykonują się
+**Rozwiązanie:**
+1. Sprawdź logi worker: `docker-compose logs worker`
+2. Sprawdź połączenie z Redis: `redis-cli ping`
+3. Upewnij się, że CELERY_BROKER_URL jest prawidłowy
+
+---
+
+## 📊 Monitorowanie i Logi
+
+### Kluczowe endpointy do monitorowania:
+```bash
+# Health check
+curl https://twoja-domena.pl/health
+
+# API status
+curl https://twoja-domena.pl/api/v1/docs
+
+# WebSocket test (w browser developer tools)
+new WebSocket('wss://twoja-domena.pl/ws/test-connection')
+```
+
+### Logi do sprawdzenia w Coolify:
+- **Application logs** - główne logi aplikacji
+- **Build logs** - błędy podczas budowy
+- **Container logs** - logi poszczególnych kontenerów
 
 ## Common Issues
 

@@ -26,6 +26,23 @@ docker run -v $(pwd):/app dify-plugin-repackaging ./plugin_repackaging.sh -p man
 docker run -v %cd%:/app dify-plugin-repackaging
 ```
 
+### Web Service Deployment
+
+For the web service component, use Coolify deployment:
+
+```bash
+# Coolify All-in-One (Recommended)
+Docker Compose File: dify-plugin-repackaging-web/docker-compose.coolify-aio.yml
+
+# Required Environment Variables
+BACKEND_CORS_ORIGINS=https://your-domain.com
+
+# Health Check Endpoint
+/health
+```
+
+See [COOLIFY_DEPLOYMENT.md](COOLIFY_DEPLOYMENT.md) for detailed deployment instructions.
+
 ### Direct Script Usage
 ```bash
 # From Dify Marketplace

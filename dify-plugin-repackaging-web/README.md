@@ -55,161 +55,57 @@ For production deployment, use the production Docker Compose file:
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-## Deployment on Coolify - Szczegółowa instrukcja
+## 🚀 Deployment on Coolify
 
-### Wymagania wstępne
-- Działająca instancja Coolify (v4)
-- Repozytorium Git z kodem aplikacji (GitHub, GitLab, Gitea, etc.)
-- Domena skierowana na serwer z Coolify
+### 📋 Opcje Wdrożenia
 
-### Krok po kroku
+Aplikacja obsługuje **3 sposoby wdrożenia** na Coolify:
 
-#### 1. Przygotowanie repozytorium
-Upewnij się, że w repozytorium znajdują się wszystkie pliki, w tym:
-- `docker-compose.prod.yml` (używany przez Coolify)
-- Wszystkie foldery źródłowe (`backend/`, `frontend/`)
-- Plik `.env.example` jako wzór konfiguracji
+1. **All-in-One (Zalecane)** - `docker-compose.coolify-aio.yml`
+2. **Multi-Service** - `docker-compose.coolify.yml` 
+3. **Simplified** - `docker-compose.coolify-simple.yml`
 
-#### 2. Utworzenie nowej aplikacji w Coolify
+### ⚡ Szybki Start (All-in-One)
 
-1. Zaloguj się do panelu Coolify
-2. Przejdź do **Projects** → wybierz swój projekt
-3. Kliknij **+ New** → **Resource**
-4. Wybierz **Docker Compose** jako typ aplikacji
-5. Wybierz **Public Repository** lub **Private Repository** (w zależności od typu repo)
+#### 1. Utwórz aplikację w Coolify
+- **Type**: Docker Compose
+- **Repository**: URL Twojego repo
+- **Docker Compose Location**: `dify-plugin-repackaging-web/docker-compose.coolify-aio.yml`
 
-#### 3. Konfiguracja źródła (Source)
+#### 2. Konfiguracja domeny
+```bash
+⚠️ WAŻNE: Ustaw domenę TYLKO dla głównej aplikacji!
 
-1. **Repository URL**: Podaj URL swojego repozytorium
-   ```
-   https://github.com/yourusername/dify-plugin-repackaging-web.git
-   ```
+✅ Główna aplikacja: https://dify-plugin.twoja-domena.pl
+❌ Backend/Worker/inne: ZOSTAW PUSTE
+```
 
-2. **Branch**: Wybierz branch (np. `main`)
+#### 3. Zmienne środowiskowe
+```bash
+# WYMAGANE
+BACKEND_CORS_ORIGINS=https://dify-plugin.twoja-domena.pl
 
-3. **Build Pack**: Upewnij się, że wybrane jest **Docker Compose**
-
-4. **Docker Compose Location**: Wpisz:
-   ```
-   docker-compose.prod.yml
-   ```
-
-#### 4. Konfiguracja zmiennych środowiskowych
-
-W sekcji **Environment Variables** dodaj następujące zmienne:
-
-```env
-# Port - jeśli chcesz użyć innego niż 80
-PORT=80
-
-# CORS - Ważne! Ustaw swoją domenę
-BACKEND_CORS_ORIGINS=["https://twoja-domena.pl","https://www.twoja-domena.pl"]
-
-# Opcjonalne - limity i retencja
+# OPCJONALNE
 RATE_LIMIT_PER_MINUTE=10
 FILE_RETENTION_HOURS=24
 MAX_FILE_SIZE=524288000
-
-# Jeśli używasz zewnętrznego Redis (opcjonalne)
-# REDIS_URL=redis://your-redis-host:6379/0
 ```
 
-**Uwaga**: `BACKEND_CORS_ORIGINS` musi być poprawnym JSON array!
+#### 4. Deploy
+- Kliknij **Deploy**
+- Sprawdź endpoint: `https://twoja-domena.pl/health`
 
-#### 5. Konfiguracja sieci i portów
+### 📚 Szczegółowa Dokumentacja
 
-1. W sekcji **Network**:
-   - **Port Exposes**: Dodaj `80:80` (lub inny port jeśli zmieniłeś w ENV)
-   - **Domains**: Dodaj swoją domenę, np. `dify-repack.twoja-domena.pl`
+**Kompletna instrukcja wdrożenia z troubleshooting:**
+👉 [COOLIFY_DEPLOYMENT.md](../COOLIFY_DEPLOYMENT.md)
 
-2. Włącz **HTTPS**:
-   - Zaznacz **Force HTTPS**
-   - Zaznacz **Auto Generate SSL** (Let's Encrypt)
-
-#### 6. Konfiguracja zasobów (opcjonalnie)
-
-W sekcji **Resources** możesz ustawić limity:
-- **CPU**: np. 2 CPU
-- **Memory**: np. 2048 MB
-- **Storage**: np. 10 GB
-
-#### 7. Ustawienia zaawansowane
-
-1. **Health Check**:
-   - Path: `/health`
-   - Interval: `30`
-   - Timeout: `10`
-   - Retries: `3`
-
-2. **Build Configuration**:
-   - Jeśli masz wolny serwer, możesz zwiększyć **Build Timeout** do `30` minut
-
-#### 8. Deploy aplikacji
-
-1. Kliknij **Save** aby zapisać konfigurację
-2. Kliknij **Deploy** aby rozpocząć wdrożenie
-3. Obserwuj logi w zakładce **Logs** aby śledzić postęp
-
-#### 9. Weryfikacja wdrożenia
-
-Po zakończeniu deploymentu:
-
-1. Sprawdź status kontenerów w zakładce **Containers**
-2. Wszystkie 6 kontenerów powinno mieć status **Running**:
-   - backend
-   - worker
-   - celery-beat
-   - frontend
-   - redis
-   - nginx
-
-3. Otwórz aplikację pod adresem: `https://dify-repack.twoja-domena.pl`
-
-### Przykładowa konfiguracja w Coolify UI
-
-```yaml
-# Environment Variables (w formacie Coolify)
-PORT=80
-BACKEND_CORS_ORIGINS=["https://dify-repack.example.com"]
-RATE_LIMIT_PER_MINUTE=20
-FILE_RETENTION_HOURS=48
-```
-
-### Troubleshooting w Coolify
-
-#### Problem: Aplikacja nie startuje
-1. Sprawdź logi w zakładce **Logs**
-2. Upewnij się, że `docker-compose.prod.yml` jest w głównym katalogu repo
-3. Sprawdź czy wszystkie zmienne środowiskowe są poprawnie ustawione
-
-#### Problem: Błąd CORS
-1. Upewnij się, że `BACKEND_CORS_ORIGINS` zawiera dokładną domenę z https://
-2. Format musi być JSON array: `["https://example.com"]`
-
-#### Problem: Brak dostępu do plików
-1. Sprawdź uprawnienia volumenów w logach
-2. Coolify automatycznie zarządza volumenami, ale możesz je sprawdzić w zakładce **Storages**
-
-#### Problem: WebSocket nie działa
-1. Upewnij się, że Coolify Proxy prawidłowo przekazuje nagłówki WebSocket
-2. W razie problemów, możesz dodać dodatkowe labels do nginx w docker-compose.prod.yml:
-   ```yaml
-   nginx:
-     labels:
-       - "coolify.websocket=true"
-   ```
-
-### Aktualizacja aplikacji
-
-1. Po wprowadzeniu zmian w kodzie i push do repozytorium
-2. W Coolify przejdź do aplikacji
-3. Kliknij **Redeploy** lub włącz **Auto Deploy** dla automatycznych wdrożeń
-
-### Backup i przywracanie
-
-1. **Volumes**: Coolify automatycznie tworzy volumes dla Redis i temp
-2. Możesz je znaleźć w zakładce **Storages**
-3. Dla backupu bazy Redis, użyj Coolify backup features lub własne skrypty
+Zawiera:
+- Szczegółowe instrukcje dla wszystkich 3 wariantów
+- Konfigurację sieci i zmiennych środowiskowych  
+- Troubleshooting najczęstszych problemów
+- Monitorowanie i logi
+- Diagramy architektury
 
 ## Configuration
 
