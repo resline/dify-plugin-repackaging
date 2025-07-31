@@ -43,6 +43,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
   const [selectedPlugin, setSelectedPlugin] = useState<Plugin | null>(null);
   const [error, setError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Load initial data on mount
   useEffect(() => {
@@ -51,7 +52,10 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
 
   // Search when filters change
   useEffect(() => {
-    searchPlugins(true);
+    // Skip the initial trigger when component mounts
+    if (!isInitialLoad) {
+      searchPlugins(true);
+    }
   }, [selectedCategory, selectedAuthor]);
 
   // Search when page changes
@@ -73,12 +77,16 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
       setAuthors(Array.isArray(authorsResult.authors) ? authorsResult.authors : []);
       
       // Initial search
-      searchPlugins();
+      await searchPlugins();
+      
+      // Mark initial load as complete
+      setIsInitialLoad(false);
     } catch (error) {
       if (process.env.NODE_ENV !== 'test') {
         console.error('Error loading initial data:', error);
       }
       setError('Failed to load marketplace data');
+      setIsInitialLoad(false);
     }
   };
 
