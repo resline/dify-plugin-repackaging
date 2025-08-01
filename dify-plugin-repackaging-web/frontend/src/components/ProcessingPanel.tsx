@@ -20,12 +20,20 @@ const ProcessingPanel: React.FC<ProcessingPanelProps> = ({
 
   return (
     <div
-      className={`fixed bottom-4 right-4 z-40 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 transition-all duration-300 ${
-        isProcessingPanelMinimized ? 'w-80' : 'w-full max-w-2xl'
+      className={`fixed z-40 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 transition-all duration-300 ${
+        isProcessingPanelMinimized ? 'w-80 bottom-4 right-4' : 'w-full max-w-2xl'
       }`}
       style={{ 
-        right: isProcessingPanelMinimized ? '1rem' : '50%',
-        transform: isProcessingPanelMinimized ? 'none' : 'translateX(50%)'
+        ...(isProcessingPanelMinimized 
+          ? {} 
+          : {
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }
+        )
       }}
     >
       {/* Header */}
