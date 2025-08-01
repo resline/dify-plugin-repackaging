@@ -146,6 +146,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
       }
     }
     
+    // For processing level, check if this is the last log entry (currently running)
+    if (log.level === 'processing') {
+      const isLastLog = logs[logs.length - 1]?.id === log.id;
+      // Only show spinning icon if it's the last log entry
+      if (isLastLog) {
+        return <Loader className="h-4 w-4 text-indigo-400 animate-spin" />;
+      } else {
+        // Show a static icon for completed processing steps
+        return <CheckCircle className="h-4 w-4 text-indigo-400" />;
+      }
+    }
+    
     // Otherwise, use standard icons
     switch (log.level) {
       case 'info':
@@ -156,8 +168,6 @@ const LogViewer: React.FC<LogViewerProps> = ({
         return <XCircle className="h-4 w-4 text-red-400" />;
       case 'success':
         return <CheckCircle className="h-4 w-4 text-green-400" />;
-      case 'processing':
-        return <Loader className="h-4 w-4 text-indigo-400 animate-spin" />;
       default:
         return <Terminal className="h-4 w-4 text-gray-400" />;
     }
