@@ -90,6 +90,31 @@ class MarketplaceService:
             logger.warning(f"Error setting cache: {e}")
     
     @staticmethod
+    def _normalize_plugin_data(plugin: Dict) -> Dict:
+        """Normalize plugin data from marketplace API to standard format"""
+        return {
+            "name": plugin.get("name", ""),
+            "author": plugin.get("org") or plugin.get("author", ""),
+            "display_name": (
+                plugin.get("label", {}).get("en_US") if isinstance(plugin.get("label"), dict)
+                else plugin.get("display_name") or plugin.get("name", "")
+            ),
+            "description": (
+                plugin.get("brief", {}).get("en_US") if isinstance(plugin.get("brief"), dict)
+                else plugin.get("description", "")
+            ),
+            "category": plugin.get("category", ""),
+            "tags": plugin.get("tags", []),
+            "latest_version": plugin.get("latest_version", ""),
+            "icon_url": plugin.get("icon") or plugin.get("icon_url"),
+            "verified": bool(plugin.get("verification") or plugin.get("verified", False)),
+            "download_count": plugin.get("install_count") or plugin.get("download_count", 0),
+            "created_at": plugin.get("created_at", ""),
+            "updated_at": plugin.get("version_updated_at") or plugin.get("updated_at", ""),
+            "rating": plugin.get("rating")
+        }
+
+    @staticmethod
     async def search_plugins(
         query: Optional[str] = None,
         author: Optional[str] = None,
@@ -147,8 +172,11 @@ class MarketplaceService:
                         "type": "plugin"
                     },
                     "transformer": lambda r: {
-                        "plugins": r.get("data", r.get("plugins", [])),
-                        "total": r.get("total", len(r.get("data", r.get("plugins", [])))),
+                        "plugins": [
+                            MarketplaceService._normalize_plugin_data(p)
+                            for p in (r.get("data", {}).get("plugins", []) if isinstance(r.get("data"), dict) else r.get("plugins", []))
+                        ],
+                        "total": r.get("data", {}).get("total") if isinstance(r.get("data"), dict) else r.get("total", 0),
                         "page": page,
                         "per_page": per_page
                     }
@@ -158,19 +186,25 @@ class MarketplaceService:
                     "method": "GET",
                     "params": params,
                     "transformer": lambda r: {
-                        "plugins": r.get("data", r.get("plugins", [])),
-                        "total": r.get("total", len(r.get("data", r.get("plugins", [])))),
+                        "plugins": [
+                            MarketplaceService._normalize_plugin_data(p)
+                            for p in (r.get("data", {}).get("plugins", []) if isinstance(r.get("data"), dict) else r.get("plugins", []))
+                        ],
+                        "total": r.get("data", {}).get("total") if isinstance(r.get("data"), dict) else r.get("total", 0),
                         "page": page,
                         "per_page": per_page
                     }
                 },
                 {
                     "url": "https://marketplace-plugin.dify.dev/api/v1/plugins",
-                    "method": "GET", 
+                    "method": "GET",
                     "params": params,
                     "transformer": lambda r: {
-                        "plugins": r.get("data", r.get("plugins", [])),
-                        "total": r.get("total", len(r.get("data", r.get("plugins", [])))),
+                        "plugins": [
+                            MarketplaceService._normalize_plugin_data(p)
+                            for p in (r.get("data", {}).get("plugins", []) if isinstance(r.get("data"), dict) else r.get("plugins", []))
+                        ],
+                        "total": r.get("data", {}).get("total") if isinstance(r.get("data"), dict) else r.get("total", 0),
                         "page": page,
                         "per_page": per_page
                     }
@@ -368,13 +402,45 @@ class MarketplaceService:
                     params={"page": 1, "page_size": 20}  # Add required pagination params
                 )
                 response.raise_for_status()
-                
+
                 result = response.json()
-                
-                # Cache the result
-                MarketplaceService._set_cache(cache_key, result)
-                
-                return result
+
+                # Extract and normalize version data
+                # API returns: {code: 0, data: {versions: [...]}} or {versions: [...]}
+                if isinstance(result.get("data"), dict) and "versions" in result["data"]:
+                    api_versions = result["data"]["versions"]
+                else:
+                    api_versions = result.get("versions", [])
+
+                # Map API fields to expected format
+                mapped_versions = []
+                for v in api_versions:
+                    if v.get("status") == "active" or not v.get("status"):  # Include active or unspecified status
+                        mapped_versions.append({
+                            "version": v.get("version", ""),
+                            "created_at": v.get("created_at", ""),
+                            "changelog": v.get("change_log", ""),
+                            "download_count": 0,  # API doesn't provide per-version download count
+                            "checksum": v.get("checksum", ""),
+                            "minimum_dify_version": f"{v.get('minimum_dify_version_major', 0)}.{v.get('minimum_dify_version_minor', 0)}.{v.get('minimum_dify_version_patch', 0)}"
+                        })
+
+                # Sort versions (newest first) using semantic versioning
+                try:
+                    from packaging import version as pkg_version
+                    mapped_versions.sort(
+                        key=lambda x: pkg_version.parse(x["version"]),
+                        reverse=True
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to sort versions semantically: {e}")
+                    # Fallback to string sort
+                    mapped_versions.sort(key=lambda x: x["version"], reverse=True)
+
+                # Cache the mapped result
+                MarketplaceService._set_cache(cache_key, mapped_versions)
+
+                return mapped_versions
                 
         except httpx.HTTPError as e:
             logger.error(f"Error getting plugin versions for {author}/{name}: {e}")
