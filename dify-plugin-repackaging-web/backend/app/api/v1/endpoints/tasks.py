@@ -226,7 +226,8 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
         raise
     except Exception as e:
         logger.exception("Error creating task")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
 
 
 @router.post("/tasks/marketplace", response_model=TaskResponse)
@@ -326,7 +327,8 @@ async def create_marketplace_task(request: Request, task_data: MarketplaceTaskCr
         )
     except Exception as e:
         logger.exception("Error creating marketplace task")
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
 
 
 @router.post("/tasks/upload", response_model=TaskResponse)
@@ -432,7 +434,8 @@ async def upload_task(
         raise
     except Exception as e:
         logger.exception("Error creating upload task")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
 
 
 
@@ -492,7 +495,8 @@ async def list_completed_tasks(limit: int = Query(default=10, ge=1, le=100)):
         }
     except Exception as e:
         logger.exception("Error listing completed tasks")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
@@ -600,7 +604,8 @@ async def download_result(task_id: str):
         raise
     except Exception as e:
         logger.exception(f"Unexpected error in download_result: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
 
 
 @router.get("/tasks")
