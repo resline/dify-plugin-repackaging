@@ -41,7 +41,7 @@ BACKEND_CORS_ORIGINS=https://your-domain.com
 /health
 ```
 
-See [COOLIFY_DEPLOYMENT.md](COOLIFY_DEPLOYMENT.md) for detailed deployment instructions.
+See [COOLIFY_DEPLOYMENT.md](docs/deployment/COOLIFY_DEPLOYMENT.md) for detailed deployment instructions.
 
 ### Direct Script Usage
 ```bash
