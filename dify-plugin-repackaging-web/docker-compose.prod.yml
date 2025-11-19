@@ -4,15 +4,22 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-["http://localhost"]}
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-false}
       - TEMP_DIR=/app/temp
       - SCRIPTS_DIR=/app/scripts
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-10}
       - FILE_RETENTION_HOURS=${FILE_RETENTION_HOURS:-24}
+      - GITHUB_API_URL=${GITHUB_API_URL:-https://github.com}
+      - MARKETPLACE_API_URL=${MARKETPLACE_API_URL:-https://marketplace.dify.ai}
     volumes:
       - temp-data:/app/temp
       - ./backend/scripts:/app/scripts:ro
@@ -30,10 +37,13 @@ services:
     build: ./backend
     restart: unless-stopped
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
       - TEMP_DIR=/app/temp
       - SCRIPTS_DIR=/app/scripts
     volumes:
@@ -49,10 +59,13 @@ services:
     build: ./backend
     restart: unless-stopped
     command: celery -A app.workers.celery_app beat --loglevel=info
+    env_file:
+      - .env
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
     depends_on:
       - redis
       - backend
@@ -70,13 +83,29 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning
+    command: >
+      sh -c "
+      if [ -n \"$$REDIS_PASSWORD\" ]; then
+        redis-server --save 60 1 --loglevel warning --requirepass \"$$REDIS_PASSWORD\"
+      else
+        redis-server --save 60 1 --loglevel warning
+      fi
+      "
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     volumes:
       - redis-data:/data
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: >
+        sh -c "
+        if [ -n \"$$REDIS_PASSWORD\" ]; then
+          redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping
+        else
+          redis-cli ping
+        fi
+        "
       interval: 30s
       timeout: 10s
       retries: 3

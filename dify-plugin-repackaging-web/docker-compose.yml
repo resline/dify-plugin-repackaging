@@ -17,7 +17,7 @@ services:
       - app-network
 
   backend:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: dify-plugin-backend
@@ -25,12 +25,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - REDIS_PASSWORD=
-      - DEBUG=True
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - DEBUG=${DEBUG:-True}
       - TEMP_DIR=/app/temp
       - UPLOAD_DIR=/app/uploads
-      - BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:80","http://frontend:80"]
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-["http://localhost:3000","http://localhost:80","http://frontend:80"]}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
     volumes:
       - ./backend/app:/app/app
       - ./backend/scripts:/app/scripts
@@ -48,15 +51,17 @@ services:
       - app-network
 
   celery_worker:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: dify-plugin-celery
     command: celery -A app.workers.celery_app worker --loglevel=info
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - REDIS_PASSWORD=
-      - DEBUG=True
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - DEBUG=${DEBUG:-True}
       - TEMP_DIR=/app/temp
       - UPLOAD_DIR=/app/uploads
     volumes:

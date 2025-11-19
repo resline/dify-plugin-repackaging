@@ -13,23 +13,36 @@ else
     exit 1
 fi
 
-# Start Redis in background
-echo "Starting Redis server..."
-redis-server --daemonize yes
-
-# Wait for Redis to be ready
-echo "Waiting for Redis..."
-counter=0
-while ! redis-cli ping > /dev/null 2>&1; do
-    counter=$((counter+1))
-    if [ $counter -gt 30 ]; then
-        echo "ERROR: Redis failed to start after 30 seconds"
-        exit 1
+# Configure Redis password if REDIS_PASSWORD is set
+if [ -n "$REDIS_PASSWORD" ]; then
+    echo "Configuring Redis with password authentication..."
+    # Add requirepass to redis config if not already present
+    if ! grep -q "^requirepass" /etc/redis/redis.conf; then
+        echo "requirepass $REDIS_PASSWORD" >> /etc/redis/redis.conf
+    else
+        # Replace existing requirepass
+        sed -i "s/^requirepass .*/requirepass $REDIS_PASSWORD/" /etc/redis/redis.conf
     fi
-    echo "Waiting for Redis... ($counter/30)"
-    sleep 1
-done
-echo "Redis is ready"
+    echo "Redis password configured"
+else
+    echo "Redis will run without password authentication (development mode)"
+    # Remove any requirepass directive
+    sed -i '/^requirepass/d' /etc/redis/redis.conf
+fi
+
+# Update supervisord environment variables for backend, worker, and celery-beat
+# to include REDIS_PASSWORD if set
+if [ -n "$REDIS_PASSWORD" ]; then
+    echo "Updating supervisord configuration with Redis password..."
+
+    # Get the properly formatted Redis URLs with password
+    REDIS_URL_WITH_PASS="redis://:${REDIS_PASSWORD}@localhost:6379/0"
+
+    # Update backend environment
+    sed -i "s|REDIS_URL=\"[^\"]*\"|REDIS_URL=\"${REDIS_URL_WITH_PASS}\"|g" /etc/supervisor/conf.d/supervisord.conf
+    sed -i "s|CELERY_BROKER_URL=\"[^\"]*\"|CELERY_BROKER_URL=\"${REDIS_URL_WITH_PASS}\"|g" /etc/supervisor/conf.d/supervisord.conf
+    sed -i "s|CELERY_RESULT_BACKEND=\"[^\"]*\"|CELERY_RESULT_BACKEND=\"${REDIS_URL_WITH_PASS}\"|g" /etc/supervisor/conf.d/supervisord.conf
+fi
 
 # Test Python environment
 echo "Testing Python environment:"
@@ -46,6 +59,6 @@ python -c "import fastapi; print('FastAPI imported successfully')" || echo "ERRO
 python -c "import redis; print('Redis-py imported successfully')" || echo "ERROR: Failed to import redis"
 python -c "import celery; print('Celery imported successfully')" || echo "ERROR: Failed to import celery"
 
-# Start supervisord
+# Start supervisord (which will start Redis, backend, workers, nginx)
 echo "Starting supervisord..."
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

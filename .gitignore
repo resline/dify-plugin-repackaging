@@ -2,3 +2,63 @@
 .idea
 .vscode
 *.iml
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.staging
+*.secret
+*.key
+
+# Plugin extraction directories
+langgenius-agent_*/
+tmp_analysis/
+*_offline/
+
+# Test artifacts
+test-results/
+playwright-report/
+.pytest_cache/
+coverage/
+htmlcov/
+.coverage
+*.log
+
+# Temporary files
+temp/
+tmp/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Node modules (frontend)
+node_modules/
+.npm/
+.yarn/
+
+# Docker volumes and data
+redis-data/
+backend_temp/
+backend_uploads/
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+Desktop.ini

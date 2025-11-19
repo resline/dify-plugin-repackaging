@@ -148,8 +148,8 @@ async def broadcast_marketplace_selection(plugin_metadata: dict):
 @router.websocket("/ws/tasks/{task_id}")
 async def websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time task updates"""
-    # Create Redis client to check if task exists
-    redis_client = await redis.from_url(settings.REDIS_URL, decode_responses=True)
+    # Create Redis client to check if task exists (with password support)
+    redis_client = await redis.from_url(settings.get_redis_url(), decode_responses=True)
     
     try:
         # Validate that task exists before accepting connection

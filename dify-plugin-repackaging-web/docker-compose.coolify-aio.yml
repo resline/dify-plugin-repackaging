@@ -6,15 +6,36 @@ services:
       context: .
       dockerfile: Dockerfile.all-in-one
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - BACKEND_CORS_ORIGINS=https://dify-plugin.resline.net
-      - TEMP_DIR=/app/temp
-      - SCRIPTS_DIR=/app/scripts
-      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-10}
+      # Core Configuration
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost:3000,http://localhost}
+      - DEBUG=${DEBUG:-false}
+      - SECRET_KEY=${SECRET_KEY}
+
+      # Redis Configuration
+      - REDIS_URL=${REDIS_URL:-redis://localhost:6379/0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+
+      # Celery Configuration
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://localhost:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://localhost:6379/0}
+
+      # File Management
+      - TEMP_DIR=${TEMP_DIR:-/app/temp}
+      - SCRIPTS_DIR=${SCRIPTS_DIR:-/app/scripts}
       - FILE_RETENTION_HOURS=${FILE_RETENTION_HOURS:-24}
-      - REDIS_URL=redis://localhost:6379/0
-      - CELERY_BROKER_URL=redis://localhost:6379/0
-      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-524288000}
+
+      # Security & Rate Limiting
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-10}
+
+      # External APIs
+      - GITHUB_API_URL=${GITHUB_API_URL:-https://github.com}
+      - MARKETPLACE_API_URL=${MARKETPLACE_API_URL:-https://marketplace.dify.ai}
+
+      # Python Path
       - PYTHONPATH=/app/backend
     volumes:
       - temp-data:/app/temp
