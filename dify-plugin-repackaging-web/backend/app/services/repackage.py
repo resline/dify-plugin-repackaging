@@ -1,6 +1,7 @@
 import os
 import subprocess
 import asyncio
+import re
 from typing import Tuple, AsyncGenerator
 from app.core.config import settings
 import logging
@@ -9,6 +10,101 @@ logger = logging.getLogger(__name__)
 
 
 class RepackageService:
+    # Security: Whitelist of allowed platforms for subprocess execution
+    # These correspond to pip platform tags used in plugin_repackaging.sh
+    ALLOWED_PLATFORMS = {
+        "manylinux_2_17_x86_64",
+        "manylinux_2_17_aarch64",
+        "manylinux2014_x86_64",
+        "manylinux2014_aarch64",
+        "linux_x86_64",
+        "linux_aarch64"
+    }
+
+    # Security: Regex pattern for validating suffix parameter
+    # Only allow alphanumeric characters, hyphens, and underscores
+    SUFFIX_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
+
+    @staticmethod
+    def _validate_platform(platform: str) -> None:
+        """
+        Validate platform parameter against whitelist to prevent command injection.
+
+        Args:
+            platform: Platform string to validate
+
+        Raises:
+            ValueError: If platform is not in the allowed whitelist
+
+        Security: This prevents attackers from injecting shell commands via the -p flag
+        """
+        if platform and platform not in RepackageService.ALLOWED_PLATFORMS:
+            logger.warning(f"Invalid platform attempted: {platform}")
+            raise ValueError(
+                f"Invalid platform '{platform}'. Allowed platforms: "
+                f"{', '.join(sorted(RepackageService.ALLOWED_PLATFORMS))}"
+            )
+
+    @staticmethod
+    def _validate_suffix(suffix: str) -> None:
+        """
+        Validate suffix parameter to prevent command injection.
+
+        Args:
+            suffix: Suffix string to validate
+
+        Raises:
+            ValueError: If suffix contains disallowed characters
+
+        Security: This prevents attackers from injecting shell commands via the -s flag
+        by restricting to alphanumeric, dash, and underscore characters only
+        """
+        if not suffix:
+            raise ValueError("Suffix cannot be empty")
+
+        if not RepackageService.SUFFIX_PATTERN.match(suffix):
+            logger.warning(f"Invalid suffix attempted: {suffix}")
+            raise ValueError(
+                f"Invalid suffix '{suffix}'. Only alphanumeric characters, "
+                f"hyphens, and underscores are allowed (pattern: ^[a-zA-Z0-9_-]+$)"
+            )
+
+    @staticmethod
+    def _validate_file_path(file_path: str) -> None:
+        """
+        Validate file path to prevent path traversal attacks.
+
+        Args:
+            file_path: File path to validate
+
+        Raises:
+            ValueError: If file path contains suspicious patterns
+
+        Security: This prevents path traversal attacks (../) and ensures the file
+        is within the expected temporary directory
+        """
+        if not file_path:
+            raise ValueError("File path cannot be empty")
+
+        # Check for path traversal attempts
+        if ".." in file_path:
+            logger.warning(f"Path traversal attempted: {file_path}")
+            raise ValueError("File path cannot contain '..' (path traversal not allowed)")
+
+        # Normalize the path and check it's within allowed directory
+        normalized_path = os.path.normpath(file_path)
+        allowed_dir = os.path.normpath(settings.TEMP_DIR)
+
+        # Ensure the file path is within the temp directory
+        if not normalized_path.startswith(allowed_dir):
+            logger.warning(f"File path outside temp directory: {file_path}")
+            raise ValueError(f"File path must be within {settings.TEMP_DIR}")
+
+        # Additional check: ensure file exists
+        if not os.path.exists(normalized_path):
+            logger.warning(f"File does not exist: {file_path}")
+            raise ValueError(f"File does not exist: {file_path}")
+
     @staticmethod
     async def repackage_plugin(
         file_path: str, 
@@ -20,13 +116,18 @@ class RepackageService:
         Run the repackaging script with retry logic and yield progress updates
         Returns generator of (message, progress_percentage)
         """
+        # Security: Validate all user inputs before passing to subprocess
+        RepackageService._validate_platform(platform)
+        RepackageService._validate_suffix(suffix)
+        RepackageService._validate_file_path(file_path)
+
         script_path = os.path.join(settings.SCRIPTS_DIR, "plugin_repackaging.sh")
-        
-        # Build command
+
+        # Build command - all parameters are now validated
         cmd = [script_path]
         if platform:
-            cmd.extend(["-p", platform])
-        cmd.extend(["-s", suffix, "local", file_path])
+            cmd.extend(["-p", platform])  # Safe: validated against whitelist
+        cmd.extend(["-s", suffix, "local", file_path])  # Safe: validated with regex and path checks
         
         logger.info(f"Running command: {' '.join(cmd)}")
         

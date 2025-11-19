@@ -12,11 +12,11 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Create Celery app
+# Create Celery app with password support
 celery_app = Celery(
     "dify_repackaging",
-    broker=settings.CELERY_BROKER_URL,
-    backend=settings.CELERY_RESULT_BACKEND
+    broker=settings.get_celery_broker_url(),
+    backend=settings.get_celery_result_backend()
 )
 
 # Configure Celery
@@ -31,8 +31,8 @@ celery_app.conf.update(
     task_soft_time_limit=25 * 60,  # 25 minutes
 )
 
-# Redis client for status updates
-redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+# Redis client for status updates with password support
+redis_client = redis.from_url(settings.get_redis_url(), decode_responses=True)
 
 
 def update_task_status(task_id: str, status: TaskStatus, progress: int = 0, 

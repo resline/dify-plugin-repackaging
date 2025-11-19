@@ -1,0 +1,8 @@
+# SHA256 checksums for dify-plugin binaries
+# Generated: 2025-11-19
+# Source: https://github.com/resline/dify-plugin-repackaging
+
+5b6235064938e06b8d9e4d6bf8dcdaeb42d960c6a5dec9d9fd3e5f63ca08e700  dify-plugin-linux-amd64-5g
+01529c850d8c0de52b82eefb16f8c42b71211e418c04eb370b1093b924c731c1  dify-plugin-linux-arm64-5g
+0ae5c2d2e1f901b1a4ff5935aba48083a542067dde4d27f05849e5e0fecdd2e8  dify-plugin-darwin-amd64-5g
+f1bee619501e1ed5818a0b1c0dcbd57c3e540b0f78680250604f6e6078977003  dify-plugin-darwin-arm64-5g

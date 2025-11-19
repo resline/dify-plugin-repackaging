@@ -24,6 +24,10 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user for security
+RUN groupadd -r -g 1000 appuser && \
+    useradd -r -u 1000 -g appuser -m -s /bin/bash appuser
+
 # Copy backend code
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
@@ -33,26 +37,37 @@ COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Create scripts directory and download dify-plugin binaries
+# Create scripts directory and download dify-plugin binaries with checksum verification
 RUN mkdir -p /app/scripts && \
     cd /app/scripts && \
+    # Download binaries and checksums
     wget -q https://github.com/resline/dify-plugin-repackaging/raw/main/dify-plugin-linux-amd64-5g && \
     wget -q https://github.com/resline/dify-plugin-repackaging/raw/main/plugin_repackaging.sh && \
-    chmod +x dify-plugin-linux-amd64-5g plugin_repackaging.sh
+    wget -q https://github.com/resline/dify-plugin-repackaging/raw/main/SHA256SUMS && \
+    # Verify checksums for security
+    echo "Verifying binary checksums..." && \
+    grep "dify-plugin-linux-amd64-5g" SHA256SUMS | sha256sum -c - && \
+    # Set executable permissions
+    chmod +x dify-plugin-linux-amd64-5g plugin_repackaging.sh && \
+    # Cleanup checksum file
+    rm SHA256SUMS
 
-# Create Redis config for persistence
-RUN mkdir -p /var/lib/redis && \
+# Create Redis config for persistence and set proper permissions
+RUN mkdir -p /var/lib/redis /var/log/redis && \
     echo "dir /var/lib/redis\n\
 save 900 1\n\
 save 300 10\n\
 save 60 10000\n\
 appendonly yes\n\
-appendfilename \"appendonly.aof\"" > /etc/redis/redis.conf
+appendfilename \"appendonly.aof\"" > /etc/redis/redis.conf && \
+    chown -R appuser:appuser /var/lib/redis /var/log/redis
 
-# Create log directory
-RUN mkdir -p /var/log/supervisor
+# Create log directory with proper permissions
+RUN mkdir -p /var/log/supervisor /var/log && \
+    chown -R appuser:appuser /var/log/supervisor /var/log
 
 # Create supervisor config
+# Note: supervisord still runs as root to manage nginx and redis, but application processes run as appuser
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 user=root\n\
@@ -62,10 +77,19 @@ logfile_backups=10\n\
 loglevel=info\n\
 pidfile=/var/run/supervisord.pid\n\
 \n\
+[program:redis]\n\
+command=redis-server /etc/redis/redis.conf\n\
+user=appuser\n\
+autostart=true\n\
+autorestart=true\n\
+startsecs=5\n\
+stdout_logfile=/var/log/redis/redis.log\n\
+stderr_logfile=/var/log/redis/redis.err\n\
 \n\
 [program:backend]\n\
 command=uvicorn app.main:app --host 0.0.0.0 --port 8000 --limit-max-requests 1000 --limit-concurrency 1000 --timeout-keep-alive 600\n\
 directory=/app/backend\n\
+user=appuser\n\
 autostart=true\n\
 autorestart=true\n\
 environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\",MAX_UPLOAD_SIZE=\"104857600\",PYTHONPATH=\"/app/backend\"\n\
@@ -81,6 +105,7 @@ stderr_logfile_backups=3\n\
 [program:worker]\n\
 command=celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=100\n\
 directory=/app/backend\n\
+user=appuser\n\
 autostart=true\n\
 autorestart=unexpected\n\
 exitcodes=0\n\
@@ -99,6 +124,7 @@ stderr_logfile_backups=3\n\
 [program:celery-beat]\n\
 command=celery -A app.workers.celery_app beat --loglevel=info\n\
 directory=/app/backend\n\
+user=appuser\n\
 autostart=true\n\
 autorestart=true\n\
 environment=REDIS_URL=\"redis://localhost:6379/0\",CELERY_BROKER_URL=\"redis://localhost:6379/0\",CELERY_RESULT_BACKEND=\"redis://localhost:6379/0\",PYTHONPATH=\"/app/backend\"\n\
@@ -130,6 +156,11 @@ http {\n\
         "" close;\n\
     }\n\
     \n\
+    # Rate limiting zones for API protection\n\
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;\n\
+    limit_req_zone $binary_remote_addr zone=upload:10m rate=2r/s;\n\
+    limit_req_zone $binary_remote_addr zone=websocket:10m rate=5r/s;\n\
+    \n\
     # Upstream backend server\n\
     upstream backend {\n\
         server localhost:8000;\n\
@@ -144,10 +175,13 @@ http {\n\
         client_body_timeout 1800s;\n\
         client_header_timeout 1800s;\n\
         \n\
-        # Security headers\n\
+        # Security headers - Enhanced for production\n\
         add_header X-Frame-Options "SAMEORIGIN" always;\n\
         add_header X-Content-Type-Options "nosniff" always;\n\
         add_header X-XSS-Protection "1; mode=block" always;\n\
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;\n\
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;\n\
         \n\
         location / {\n\
             root /usr/share/nginx/html;\n\
@@ -155,7 +189,41 @@ http {\n\
             add_header Cache-Control "no-cache, no-store, must-revalidate";\n\
         }\n\
         \n\
+        # API endpoints with rate limiting\n\
+        location /api/upload {\n\
+            # Stricter rate limiting for uploads (2 req/s, burst 5)\n\
+            limit_req zone=upload burst=5 nodelay;\n\
+            limit_req_status 429;\n\
+            \n\
+            proxy_pass http://backend;\n\
+            proxy_http_version 1.1;\n\
+            \n\
+            # Headers for regular HTTP requests\n\
+            proxy_set_header Host $host;\n\
+            proxy_set_header X-Real-IP $remote_addr;\n\
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+            proxy_set_header X-Forwarded-Proto $scheme;\n\
+            proxy_set_header X-Forwarded-Host $host;\n\
+            proxy_set_header X-Forwarded-Port $server_port;\n\
+            \n\
+            # Connection handling\n\
+            proxy_set_header Connection "";\n\
+            \n\
+            # Timeouts\n\
+            proxy_connect_timeout 1800s;\n\
+            proxy_send_timeout 1800s;\n\
+            proxy_read_timeout 1800s;\n\
+            \n\
+            # Disable buffering for better streaming\n\
+            proxy_request_buffering off;\n\
+            proxy_buffering off;\n\
+        }\n\
+        \n\
         location /api {\n\
+            # Rate limiting for general API (10 req/s, burst 20)\n\
+            limit_req zone=api burst=20 nodelay;\n\
+            limit_req_status 429;\n\
+            \n\
             proxy_pass http://backend;\n\
             proxy_http_version 1.1;\n\
             \n\
@@ -182,6 +250,10 @@ http {\n\
         \n\
         # WebSocket location with exact match for better performance\n\
         location ~ ^/ws/tasks/(.*)$ {\n\
+            # Rate limiting for WebSocket connections (5 req/s, burst 10)\n\
+            limit_req zone=websocket burst=10 nodelay;\n\
+            limit_req_status 429;\n\
+            \n\
             proxy_pass http://backend/ws/tasks/$1;\n\
             proxy_http_version 1.1;\n\
             \n\
@@ -214,6 +286,10 @@ http {\n\
         \n\
         # General /ws location for other WebSocket endpoints\n\
         location /ws {\n\
+            # Rate limiting for WebSocket connections (5 req/s, burst 10)\n\
+            limit_req zone=websocket burst=10 nodelay;\n\
+            limit_req_status 429;\n\
+            \n\
             proxy_pass http://backend;\n\
             proxy_http_version 1.1;\n\
             \n\
@@ -254,6 +330,17 @@ http {\n\
     }\n\
 }' > /etc/nginx/nginx.conf
 
+# Set proper ownership for all application directories and files
+RUN chown -R appuser:appuser /app /usr/share/nginx/html && \
+    # Nginx needs to write to these directories\n\
+    mkdir -p /var/cache/nginx /var/run && \
+    chown -R appuser:appuser /var/cache/nginx && \
+    chmod -R 755 /var/cache/nginx && \
+    # Allow appuser to bind to port 80 (needs NET_BIND_SERVICE capability or run on different port)\n\
+    # For production, consider using a reverse proxy in front or running nginx as root\n\
+    touch /var/run/nginx.pid && \
+    chown appuser:appuser /var/run/nginx.pid
+
 # Set environment variables
 ENV REDIS_URL="redis://localhost:6379/0"
 ENV CELERY_BROKER_URL="redis://localhost:6379/0"
@@ -262,4 +349,6 @@ ENV PYTHONPATH=/app/backend
 
 EXPOSE 80
 
+# Note: start.sh will be executed by supervisord which runs as root
+# but individual services will run as appuser
 CMD ["/start.sh"]
