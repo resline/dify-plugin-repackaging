@@ -48,7 +48,10 @@ class Settings(BaseSettings):
     # Security
     AUTH_PASSWORD: Optional[str] = None  # If empty, authentication is disabled
     RATE_LIMIT_PER_MINUTE: int = 30
-    AUTH_RATE_LIMIT_PER_MINUTE: int = 5  # Rate limit for failed auth attempts
+    # Rate limit for failed auth attempts
+    # Set to 20 to allow legitimate users more attempts while still providing
+    # protection against brute-force attacks (20 attempts per minute = 1 attempt per 3 seconds)
+    AUTH_RATE_LIMIT_PER_MINUTE: int = 20
     ALLOWED_DOWNLOAD_DOMAINS: list[str] = [
         "github.com",
         "githubusercontent.com",
