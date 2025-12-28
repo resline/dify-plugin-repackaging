@@ -126,6 +126,11 @@ async def verify_authentication(request: Request) -> bool:
     Supports both HTTP Basic Auth and X-Auth-Token header.
 
     Returns True if authenticated, raises HTTPException if not.
+
+    Rate limiting strategy:
+    - Only applies to requests WITH credentials (potential brute-force attacks)
+    - Missing credentials return 401 without counting as failed attempt
+    - Wrong credentials count as failed attempt and trigger rate limiting
     """
     # If no password is configured, authentication is disabled
     if not settings.AUTH_PASSWORD:
@@ -134,23 +139,24 @@ async def verify_authentication(request: Request) -> bool:
 
     client_id = get_client_identifier(request)
 
-    # Check if client is rate limited
-    if auth_rate_limiter.is_rate_limited(client_id):
-        logger.warning(f"Rate limit exceeded for authentication attempts from {client_id}")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed authentication attempts. Please try again later.",
-            headers={"Retry-After": "60"}
-        )
-
     # Method 1: Check X-Auth-Token header
     auth_token = request.headers.get("X-Auth-Token")
     if auth_token:
+        # Check rate limit BEFORE verifying credentials (prevent brute-force)
+        if auth_rate_limiter.is_rate_limited(client_id):
+            logger.warning(f"Rate limit exceeded for authentication attempts from {client_id}")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many failed authentication attempts. Please try again later.",
+                headers={"Retry-After": "60"}
+            )
+
         if verify_password(auth_token):
             logger.info(f"Successful authentication via X-Auth-Token from {client_id}")
             auth_rate_limiter.reset(client_id)
             return True
         else:
+            # WRONG credentials provided - record as failed attempt
             logger.warning(f"Failed authentication via X-Auth-Token from {client_id}")
             auth_rate_limiter.record_attempt(client_id)
             raise HTTPException(
@@ -164,11 +170,22 @@ async def verify_authentication(request: Request) -> bool:
         credentials = extract_basic_auth(authorization)
         if credentials:
             username, password = credentials
+
+            # Check rate limit BEFORE verifying credentials (prevent brute-force)
+            if auth_rate_limiter.is_rate_limited(client_id):
+                logger.warning(f"Rate limit exceeded for authentication attempts from {client_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many failed authentication attempts. Please try again later.",
+                    headers={"Retry-After": "60"}
+                )
+
             if verify_password(password):
                 logger.info(f"Successful authentication via Basic Auth (user: {username}) from {client_id}")
                 auth_rate_limiter.reset(client_id)
                 return True
             else:
+                # WRONG credentials provided - record as failed attempt
                 logger.warning(f"Failed authentication via Basic Auth (user: {username}) from {client_id}")
                 auth_rate_limiter.record_attempt(client_id)
                 raise HTTPException(
@@ -176,9 +193,9 @@ async def verify_authentication(request: Request) -> bool:
                     detail="Invalid credentials"
                 )
 
-    # No authentication provided
+    # No authentication provided - this is NOT a brute-force attack, just missing credentials
+    # Return 401 WITHOUT recording as failed attempt
     logger.warning(f"No authentication provided from {client_id}")
-    auth_rate_limiter.record_attempt(client_id)
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentication required. Provide X-Auth-Token header or HTTP Basic Auth."

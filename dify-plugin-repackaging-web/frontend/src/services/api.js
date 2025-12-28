@@ -20,7 +20,18 @@ const api = createAxiosWithRetry(
       // Don't retry client errors (4xx) except for 408 (timeout) and 429 (rate limit)
       if (error.response) {
         const status = error.response.status;
-        if (status === 408 || status === 429) return true;
+
+        // Special handling for 429: don't retry if it's an authentication failure
+        if (status === 429) {
+          const detail = error.response.data?.detail || '';
+          // Don't retry authentication-related rate limits
+          if (typeof detail === 'string' && detail.toLowerCase().includes('authentication')) {
+            return false;
+          }
+          return true; // Retry other 429 errors (regular API rate limits)
+        }
+
+        if (status === 408) return true;
         if (status >= 400 && status < 500) return false;
       }
       // Retry network errors and 5xx errors
