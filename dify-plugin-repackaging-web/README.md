@@ -115,6 +115,7 @@ Zawiera:
 |----------|-------------|---------|
 | `PORT` | Port to expose the application | 80 |
 | `BACKEND_CORS_ORIGINS` | Allowed CORS origins (JSON array) | ["http://localhost"] |
+| `AUTH_PASSWORD` | Authentication password (empty = disabled) | None |
 | `RATE_LIMIT_PER_MINUTE` | API rate limit per IP | 10 |
 | `FILE_RETENTION_HOURS` | Hours to keep processed files | 24 |
 | `MAX_FILE_SIZE` | Maximum file size in bytes | 524288000 (500MB) |

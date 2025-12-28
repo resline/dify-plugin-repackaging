@@ -33,6 +33,8 @@ services:
       - SCRIPTS_DIR=/app/scripts
       - TESTING=true
       - LOG_LEVEL=DEBUG
+      # Authentication disabled for testing (empty value)
+      - AUTH_PASSWORD=
     volumes:
       - ./temp-test:/app/temp
       - ./dify-plugin-repackaging-web/backend/scripts:/app/scripts:ro

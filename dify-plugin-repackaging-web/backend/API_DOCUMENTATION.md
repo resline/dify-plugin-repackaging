@@ -12,7 +12,17 @@ http://localhost:8000/api/v1
 
 ## Authentication
 
-Currently, the API does not require authentication but implements rate limiting.
+The API supports optional password-based authentication. When the `AUTH_PASSWORD` environment variable is set, all API requests require authentication via the `X-Auth-Password` header.
+
+### Authentication Header
+
+If authentication is enabled, include the following header in all requests:
+
+```
+X-Auth-Password: your-password
+```
+
+If authentication is not enabled (AUTH_PASSWORD is empty), this header is not required.
 
 ## Rate Limiting
 

@@ -31,6 +31,8 @@ services:
       - TEMP_DIR=/app/temp
       - UPLOAD_DIR=/app/uploads
       - BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:80","http://frontend:80"]
+      # Authentication password - leave empty to disable authentication
+      # - AUTH_PASSWORD=your-secure-password
     volumes:
       - ./backend/app:/app/app
       - ./backend/scripts:/app/scripts
