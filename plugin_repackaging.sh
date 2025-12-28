@@ -9,11 +9,11 @@ GITHUB_API_URL="${GITHUB_API_URL:-$DEFAULT_GITHUB_API_URL}"
 MARKETPLACE_API_URL="${MARKETPLACE_API_URL:-$DEFAULT_MARKETPLACE_API_URL}"
 PIP_MIRROR_URL="${PIP_MIRROR_URL:-$DEFAULT_PIP_MIRROR_URL}"
 
-CURR_DIR=`dirname $0`
-cd $CURR_DIR
-CURR_DIR=`pwd`
-USER=`whoami`
-ARCH_NAME=`uname -m`
+CURR_DIR=$(dirname "$0")
+cd "$CURR_DIR"
+CURR_DIR=$(pwd)
+USER=$(whoami)
+ARCH_NAME=$(uname -m)
 OS_TYPE=$(uname)
 OS_TYPE=$(echo "$OS_TYPE" | tr '[:upper:]' '[:lower:]')
 
@@ -36,19 +36,19 @@ market(){
 		exit 1
 	fi
 	echo "From the Dify Marketplace downloading ..."
-	PLUGIN_AUTHOR=$2
-	PLUGIN_NAME=$3
-	PLUGIN_VERSION=$4
-	PLUGIN_PACKAGE_PATH=${CURR_DIR}/${PLUGIN_AUTHOR}-${PLUGIN_NAME}_${PLUGIN_VERSION}.difypkg
-	PLUGIN_DOWNLOAD_URL=${MARKETPLACE_API_URL}/api/v1/plugins/${PLUGIN_AUTHOR}/${PLUGIN_NAME}/${PLUGIN_VERSION}/download
+	PLUGIN_AUTHOR="$2"
+	PLUGIN_NAME="$3"
+	PLUGIN_VERSION="$4"
+	PLUGIN_PACKAGE_PATH="${CURR_DIR}/${PLUGIN_AUTHOR}-${PLUGIN_NAME}_${PLUGIN_VERSION}.difypkg"
+	PLUGIN_DOWNLOAD_URL="${MARKETPLACE_API_URL}/api/v1/plugins/${PLUGIN_AUTHOR}/${PLUGIN_NAME}/${PLUGIN_VERSION}/download"
 	echo "Downloading ${PLUGIN_DOWNLOAD_URL} ..."
-	curl -L -o ${PLUGIN_PACKAGE_PATH} ${PLUGIN_DOWNLOAD_URL}
+	curl -L -o "${PLUGIN_PACKAGE_PATH}" "${PLUGIN_DOWNLOAD_URL}"
 	if [[ $? -ne 0 ]]; then
 		echo "Download failed, please check the plugin author, name and version."
 		exit 1
 	fi
 	echo "Download success."
-	repackage ${PLUGIN_PACKAGE_PATH}
+	repackage "${PLUGIN_PACKAGE_PATH}"
 }
 
 github(){
@@ -62,27 +62,27 @@ github(){
 		exit 1
 	fi
 	echo "From the Github downloading ..."
-	GITHUB_REPO=$2
+	GITHUB_REPO="$2"
 	if [[ "${GITHUB_REPO}" != "${GITHUB_API_URL}"* ]]; then
 		GITHUB_REPO="${GITHUB_API_URL}/${GITHUB_REPO}"
 	fi
-	RELEASE_TITLE=$3
-	ASSETS_NAME=$4
+	RELEASE_TITLE="$3"
+	ASSETS_NAME="$4"
 	PLUGIN_NAME="${ASSETS_NAME%.difypkg}"
-	PLUGIN_PACKAGE_PATH=${CURR_DIR}/${PLUGIN_NAME}-${RELEASE_TITLE}.difypkg
-	PLUGIN_DOWNLOAD_URL=${GITHUB_REPO}/releases/download/${RELEASE_TITLE}/${ASSETS_NAME}
+	PLUGIN_PACKAGE_PATH="${CURR_DIR}/${PLUGIN_NAME}-${RELEASE_TITLE}.difypkg"
+	PLUGIN_DOWNLOAD_URL="${GITHUB_REPO}/releases/download/${RELEASE_TITLE}/${ASSETS_NAME}"
 	echo "Downloading ${PLUGIN_DOWNLOAD_URL} ..."
-	curl -L -o ${PLUGIN_PACKAGE_PATH} ${PLUGIN_DOWNLOAD_URL}
+	curl -L -o "${PLUGIN_PACKAGE_PATH}" "${PLUGIN_DOWNLOAD_URL}"
 	if [[ $? -ne 0 ]]; then
 		echo "Download failed, please check the github repo, release title and assets name."
 		exit 1
 	fi
 	echo "Download success."
-	repackage ${PLUGIN_PACKAGE_PATH}
+	repackage "${PLUGIN_PACKAGE_PATH}"
 }
 
 _local(){
-	echo $2
+	echo "$2"
 	if [[ -z "$2" ]]; then
 		echo ""
 		echo "Usage: "$0" local [difypkg path]"
@@ -92,25 +92,30 @@ _local(){
 		echo ""
 		exit 1
 	fi
-	PLUGIN_PACKAGE_PATH=`realpath $2`
-	repackage ${PLUGIN_PACKAGE_PATH}
+	# Validate path doesn't contain shell metacharacters
+	if [[ "$2" =~ [\;\|\&\$\`] ]]; then
+		echo "Error: Invalid path. Path contains shell metacharacters."
+		exit 1
+	fi
+	PLUGIN_PACKAGE_PATH="$(realpath "$2")"
+	repackage "${PLUGIN_PACKAGE_PATH}"
 }
 
 repackage(){
-	local PACKAGE_PATH=$1
-	PACKAGE_NAME_WITH_EXTENSION=`basename ${PACKAGE_PATH}`
+	local PACKAGE_PATH="$1"
+	PACKAGE_NAME_WITH_EXTENSION=$(basename "${PACKAGE_PATH}")
 	PACKAGE_NAME="${PACKAGE_NAME_WITH_EXTENSION%.*}"
 	echo "Unziping ..."
 	install_unzip
-	unzip -o ${PACKAGE_PATH} -d ${CURR_DIR}/${PACKAGE_NAME}
+	unzip -o "${PACKAGE_PATH}" -d "${CURR_DIR}/${PACKAGE_NAME}"
 	if [[ $? -ne 0 ]]; then
 		echo "Unzip failed."
 		exit 1
 	fi
 	echo "Unzip success."
 	echo "Repackaging ..."
-	cd ${CURR_DIR}/${PACKAGE_NAME}
-	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
+	cd "${CURR_DIR}/${PACKAGE_NAME}"
+	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url "${PIP_MIRROR_URL}" --trusted-host mirrors.aliyun.com
 	if [[ $? -ne 0 ]]; then
 		echo "Pip download failed."
 		exit 1
@@ -135,9 +140,9 @@ repackage(){
 			rm -f "${IGNORE_PATH}.bak"
 		fi
 	fi
-	cd ${CURR_DIR}
-	chmod 755 ${CURR_DIR}/${CMD_NAME}
-	if ! ${CURR_DIR}/${CMD_NAME} plugin package ${CURR_DIR}/${PACKAGE_NAME} -o ${CURR_DIR}/${PACKAGE_NAME}-${PACKAGE_SUFFIX}.difypkg; then
+	cd "${CURR_DIR}"
+	chmod 755 "${CURR_DIR}/${CMD_NAME}"
+	if ! "${CURR_DIR}/${CMD_NAME}" plugin package "${CURR_DIR}/${PACKAGE_NAME}" -o "${CURR_DIR}/${PACKAGE_NAME}-${PACKAGE_SUFFIX}.difypkg"; then
 		echo "Error: Repackaging failed"
 		exit 1
 	fi
@@ -171,8 +176,22 @@ print_usage() {
 
 while getopts "p:s:" opt; do
 	case "$opt" in
-		p) PIP_PLATFORM="--platform ${OPTARG} --only-binary=:all:" ;;
-		s) PACKAGE_SUFFIX="${OPTARG}" ;;
+		p)
+			# Validate platform option - only allow alphanumeric, dots, underscores, and hyphens
+			if [[ ! "${OPTARG}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+				echo "Error: Invalid platform value. Only alphanumeric characters, dots, underscores, and hyphens are allowed."
+				exit 1
+			fi
+			PIP_PLATFORM="--platform ${OPTARG} --only-binary=:all:"
+			;;
+		s)
+			# Validate suffix option - only allow alphanumeric, underscores, and hyphens
+			if [[ ! "${OPTARG}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+				echo "Error: Invalid suffix value. Only alphanumeric characters, underscores, and hyphens are allowed."
+				exit 1
+			fi
+			PACKAGE_SUFFIX="${OPTARG}"
+			;;
 		*) print_usage; exit 1 ;;
 	esac
 done

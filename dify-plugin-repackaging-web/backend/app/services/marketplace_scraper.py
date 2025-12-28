@@ -33,7 +33,7 @@ class MarketplaceScraper:
     def _get_cache_key(self, key_type: str, **kwargs) -> str:
         """Generate consistent cache key"""
         params_str = json.dumps(kwargs, sort_keys=True)
-        hash_key = hashlib.md5(params_str.encode()).hexdigest()
+        hash_key = hashlib.md5(params_str.encode(), usedforsecurity=False).hexdigest()
         return f"{self.cache_prefix}:{key_type}:{hash_key}"
     
     def _get_from_cache(self, key: str) -> Optional[Any]:

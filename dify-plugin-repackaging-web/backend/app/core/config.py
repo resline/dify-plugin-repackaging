@@ -46,10 +46,12 @@ class Settings(BaseSettings):
     FILE_RETENTION_DAYS: int = 7  # Retention period for completed files
     
     # Security
+    AUTH_PASSWORD: Optional[str] = None  # If empty, authentication is disabled
     RATE_LIMIT_PER_MINUTE: int = 30
+    AUTH_RATE_LIMIT_PER_MINUTE: int = 5  # Rate limit for failed auth attempts
     ALLOWED_DOWNLOAD_DOMAINS: list[str] = [
         "github.com",
-        "githubusercontent.com", 
+        "githubusercontent.com",
         "marketplace.dify.ai",
         "dify.ai"
     ]

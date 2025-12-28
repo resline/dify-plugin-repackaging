@@ -37,6 +37,9 @@ Docker Compose File: dify-plugin-repackaging-web/docker-compose.coolify-aio.yml
 # Required Environment Variables
 BACKEND_CORS_ORIGINS=https://your-domain.com
 
+# Optional Environment Variables
+AUTH_PASSWORD=your-secure-password  # Leave empty to disable authentication
+
 # Health Check Endpoint
 /health
 ```

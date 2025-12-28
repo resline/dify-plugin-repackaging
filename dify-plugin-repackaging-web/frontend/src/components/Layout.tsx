@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Link, Store, File, ChevronLeft, Plus, Command, Moon, Sun } from 'lucide-react';
+import { Package, Link, Store, File, ChevronLeft, Plus, Command, Moon, Sun, LogOut } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Tab {
   id: string;
@@ -18,15 +19,16 @@ interface LayoutProps {
   showBackButton?: boolean;
 }
 
-const Layout: React.FC<LayoutProps> = ({ 
-  children, 
-  currentTab, 
-  onTabChange, 
+const Layout: React.FC<LayoutProps> = ({
+  children,
+  currentTab,
+  onTabChange,
   isProcessing,
   onNewTask,
   showBackButton = false
 }) => {
   const { isDark, toggleTheme } = useTheme();
+  const { logout } = useAuth();
   const [showKeyboardHint, setShowKeyboardHint] = useState(false);
 
   // Keyboard shortcuts
@@ -99,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({
                   <Moon className="h-5 w-5" />
                 )}
               </button>
-              
+
               {/* Keyboard shortcuts hint */}
               <button
                 onClick={() => setShowKeyboardHint(!showKeyboardHint)}
@@ -108,7 +110,17 @@ const Layout: React.FC<LayoutProps> = ({
               >
                 <Command className="h-4 w-4" />
               </button>
-              
+
+              {/* Logout button */}
+              <button
+                onClick={logout}
+                className="p-2 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                title="Logout"
+                aria-label="Logout"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+
               {/* New Task button - always visible */}
               <button
                 onClick={onNewTask}

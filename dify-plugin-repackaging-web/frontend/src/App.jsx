@@ -8,26 +8,34 @@ import Sidebar from './components/Sidebar';
 import ProcessingPanel from './components/ProcessingPanel';
 import { taskService } from './services/api';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LoginForm } from './components/LoginForm';
 import { ToastContainer, useToast } from './components/Toast';
 import useDeepLink from './hooks/useDeepLink';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import useAppStore from './stores/appStore';
 
 function AppContent() {
+  const { isAuthenticated } = useAuth();
   const { toasts, success, error, removeToast } = useToast();
   const deepLinkData = useDeepLink();
   const [isLoading, setIsLoading] = useState(false);
   const [initialUrl, setInitialUrl] = useState('');
-  
+
   // Use global state from Zustand
-  const { 
-    currentTask, 
-    setCurrentTask, 
-    currentTab, 
+  const {
+    currentTask,
+    setCurrentTask,
+    currentTab,
     setCurrentTab,
     formState,
-    setFormState 
+    setFormState
   } = useAppStore();
+
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
+    return <LoginForm />;
+  }
   
   // Initialize tab from deep link if needed
   useEffect(() => {
@@ -293,7 +301,9 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <AppContent />
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

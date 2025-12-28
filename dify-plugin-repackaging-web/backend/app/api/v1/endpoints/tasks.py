@@ -4,7 +4,7 @@ from app.models.task import TaskCreate, TaskResponse, TaskStatus, MarketplaceTas
 from app.workers.celery_app import process_repackaging, process_marketplace_repackaging, redis_client
 from app.core.config import settings
 from app.services.marketplace import MarketplaceService
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -15,6 +15,7 @@ import os
 import shutil
 from datetime import datetime
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +26,146 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["tasks"])
 
 
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize filename to prevent path traversal and command injection.
+
+    Args:
+        filename: The original filename
+
+    Returns:
+        Sanitized filename safe for use in file operations
+
+    Raises:
+        ValueError: If filename is invalid or unsafe
+    """
+    if not filename:
+        raise ValueError("Filename cannot be empty")
+
+    # Use basename to strip any path components (prevents path traversal)
+    safe_filename = os.path.basename(filename)
+
+    # Replace any characters not matching [a-zA-Z0-9._-] with underscore
+    safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', safe_filename)
+
+    # Ensure filename is not empty after sanitization
+    if not safe_filename or safe_filename in ('.', '..'):
+        raise ValueError("Invalid filename after sanitization")
+
+    # Ensure the filename ends with .difypkg
+    if not safe_filename.endswith('.difypkg'):
+        # If it was stripped, add it back
+        if '.difypkg' in filename:
+            safe_filename = safe_filename + '.difypkg'
+        else:
+            raise ValueError("Filename must end with .difypkg extension")
+
+    return safe_filename
+
+
+def validate_platform(platform: str) -> str:
+    """
+    Validate platform parameter against whitelist.
+
+    Args:
+        platform: Platform string to validate
+
+    Returns:
+        Validated platform string
+
+    Raises:
+        ValueError: If platform is not in whitelist
+    """
+    allowed_platforms = {
+        "",  # Empty string for default
+        "manylinux2014_x86_64",
+        "manylinux2014_aarch64",
+        "manylinux_2_17_x86_64",
+        "manylinux_2_17_aarch64",
+        "macosx_10_9_x86_64",
+        "macosx_11_0_arm64"
+    }
+
+    if platform not in allowed_platforms:
+        raise ValueError(
+            f"Invalid platform '{platform}'. Must be one of: {', '.join(sorted(p for p in allowed_platforms if p))}"
+        )
+
+    return platform
+
+
+def validate_suffix(suffix: str) -> str:
+    """
+    Validate suffix parameter to prevent command injection.
+
+    Args:
+        suffix: Suffix string to validate
+
+    Returns:
+        Validated suffix string
+
+    Raises:
+        ValueError: If suffix contains invalid characters or is too long
+    """
+    if not suffix:
+        raise ValueError("Suffix cannot be empty")
+
+    if len(suffix) > 50:
+        raise ValueError("Suffix must be 50 characters or less")
+
+    if not re.match(r'^[a-zA-Z0-9_-]+$', suffix):
+        raise ValueError("Suffix can only contain alphanumeric characters, underscores, and hyphens")
+
+    return suffix
+
+
+def validate_task_path(task_dir: str, file_path: str) -> str:
+    """
+    Validate that a file path stays within the task directory (prevents path traversal).
+
+    Args:
+        task_dir: The base task directory
+        file_path: The file path to validate
+
+    Returns:
+        The resolved absolute path
+
+    Raises:
+        ValueError: If path traversal is detected
+    """
+    # Get absolute paths
+    abs_task_dir = os.path.abspath(task_dir)
+    abs_file_path = os.path.abspath(file_path)
+
+    # Check if the file path is within the task directory
+    if not abs_file_path.startswith(abs_task_dir + os.sep):
+        raise ValueError("Path traversal detected: file path must be within task directory")
+
+    return abs_file_path
+
+
 class TaskCreateWithMarketplace(BaseModel):
     """Task creation with optional marketplace plugin fields"""
     url: Optional[str] = Field(None, description="Direct URL to the .difypkg file")
     marketplace_plugin: Optional[dict] = Field(
-        None, 
+        None,
         description="Marketplace plugin info with author, name, and version",
         example={"author": "langgenius", "name": "agent", "version": "0.0.9"}
     )
     platform: str = Field("", description="Target platform for repackaging")
     suffix: str = Field("offline", description="Suffix for the output file")
+
+    @field_validator('platform')
+    @classmethod
+    def validate_platform_field(cls, v: str) -> str:
+        """Validate platform against whitelist"""
+        return validate_platform(v)
+
+    @field_validator('suffix')
+    @classmethod
+    def validate_suffix_field(cls, v: str) -> str:
+        """Validate suffix to prevent command injection"""
+        return validate_suffix(v)
 
 
 @router.post("/tasks", response_model=TaskResponse)
@@ -341,50 +472,75 @@ async def upload_task(
 ):
     """
     Create a new repackaging task by uploading a .difypkg file
-    
+
     This endpoint allows you to upload a .difypkg file directly from your computer
     for repackaging with offline dependencies.
-    
+
     Parameters:
     - **file**: The .difypkg file to upload (required)
     - **platform**: Target platform for repackaging (optional, defaults to auto-detect)
     - **suffix**: Suffix for output file (optional, defaults to "offline")
-    
+
     File restrictions:
     - Must have .difypkg extension
     - Maximum size: 100MB
-    
+
     Returns:
     - Task ID and initial status for tracking the repackaging progress
     """
     try:
-        # Validate file extension
-        if not file.filename.endswith('.difypkg'):
+        # Validate platform and suffix parameters
+        try:
+            platform = validate_platform(platform)
+            suffix = validate_suffix(suffix)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # Validate and sanitize filename
+        if not file.filename:
             raise HTTPException(
                 status_code=400,
-                detail="Only .difypkg files are allowed"
+                detail="Filename cannot be empty"
             )
-        
+
+        try:
+            safe_filename = sanitize_filename(file.filename)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid filename: {str(e)}"
+            )
+
         # Check file size (100MB limit)
         file.file.seek(0, 2)  # Move to end of file
         file_size = file.file.tell()
         file.file.seek(0)  # Reset to beginning
-        
+
         if file_size > 100 * 1024 * 1024:  # 100MB
             raise HTTPException(
                 status_code=400,
                 detail="File size must be less than 100MB"
             )
-        
+
         # Generate task ID
         task_id = str(uuid.uuid4())
-        
+
         # Create task directory
         task_dir = os.path.join(settings.TEMP_DIR, task_id)
         os.makedirs(task_dir, exist_ok=True)
-        
-        # Save uploaded file
-        file_path = os.path.join(task_dir, file.filename)
+
+        # Save uploaded file with sanitized filename
+        file_path = os.path.join(task_dir, safe_filename)
+
+        # Validate path to prevent traversal
+        try:
+            file_path = validate_task_path(task_dir, file_path)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file path: {str(e)}"
+            )
+
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
@@ -397,10 +553,10 @@ async def upload_task(
             "platform": platform,
             "suffix": suffix,
             "progress": 0,
-            "original_filename": file.filename,
+            "original_filename": safe_filename,
             "upload_info": {
                 "source": "upload",
-                "filename": file.filename,
+                "filename": safe_filename,
                 "size": file_size
             }
         }
@@ -421,7 +577,7 @@ async def upload_task(
             is_local_file=True  # Flag to indicate it's a local file
         )
         
-        logger.info(f"Created upload task {task_id} for file {file.filename}")
+        logger.info(f"Created upload task {task_id} for file {safe_filename}")
         
         return TaskResponse(
             task_id=task_id,

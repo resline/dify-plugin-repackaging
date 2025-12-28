@@ -59,6 +59,10 @@ RATE_LIMIT_PER_MINUTE=10
 FILE_RETENTION_HOURS=24
 MAX_FILE_SIZE=524288000
 
+# Autentykacja - ustaw hasło aby wymagać uwierzytelniania
+# Pozostaw puste aby wyłączyć autentykację
+AUTH_PASSWORD=your-secure-password
+
 # Tylko dla wersji multi-service
 COMPOSE_PROJECT_NAME=dify-plugin-repackaging
 ```
@@ -88,6 +92,10 @@ COMPOSE_PROJECT_NAME=dify-plugin-repackaging
 # Opcjonalne
 RATE_LIMIT_PER_MINUTE=10
 FILE_RETENTION_HOURS=24
+
+# Autentykacja - ustaw hasło aby wymagać uwierzytelniania
+# Pozostaw puste aby wyłączyć autentykację
+AUTH_PASSWORD=your-secure-password
 ```
 
 #### Architektura Serwisów:

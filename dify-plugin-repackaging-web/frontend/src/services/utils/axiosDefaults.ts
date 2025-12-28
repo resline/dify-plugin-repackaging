@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+const AUTH_TOKEN_KEY = 'auth_token';
+
 /**
  * Configure default axios settings for better error handling
  */
@@ -7,11 +9,18 @@ export function configureAxiosDefaults(): void {
   // Set default timeout for all requests
   axios.defaults.timeout = 30000; // 30 seconds
 
-  // Add request interceptor to add timestamps
+  // Add request interceptor to add timestamps and auth token
   axios.interceptors.request.use(
     (config) => {
       // Add timestamp to track request duration
       (config as any)._requestStartTime = Date.now();
+
+      // Add auth token to headers
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (token && config.headers) {
+        config.headers['X-Auth-Token'] = token;
+      }
+
       return config;
     },
     (error) => {
@@ -19,7 +28,7 @@ export function configureAxiosDefaults(): void {
     }
   );
 
-  // Add response interceptor for logging
+  // Add response interceptor for logging and auth errors
   axios.interceptors.response.use(
     (response) => {
       // Log slow requests in development (but not in tests)
@@ -35,6 +44,13 @@ export function configureAxiosDefaults(): void {
       // Don't log cancelled requests
       if (axios.isCancel(error)) {
         return Promise.reject(error);
+      }
+
+      // Handle 401 Unauthorized - clear token and trigger re-login
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        // Dispatch custom event to notify AuthProvider
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       }
 
       // Log request duration for failed requests (but not in tests)
