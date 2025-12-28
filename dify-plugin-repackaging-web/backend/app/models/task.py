@@ -1,7 +1,8 @@
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, HttpUrl, Field, field_validator
 from typing import Optional, Literal
 from datetime import datetime
 from enum import Enum
+import re
 
 
 class TaskStatus(str, Enum):
@@ -27,6 +28,35 @@ class TaskCreate(BaseModel):
     platform: Platform = Field(Platform.DEFAULT, description="Target platform for repackaging")
     suffix: str = Field("offline", description="Suffix for the output file")
 
+    @field_validator('platform')
+    @classmethod
+    def validate_platform(cls, v: Platform) -> Platform:
+        """Validate platform against whitelist of allowed values"""
+        allowed_platforms = {
+            Platform.DEFAULT,
+            Platform.MANYLINUX2014_X86_64,
+            Platform.MANYLINUX2014_AARCH64,
+            Platform.MANYLINUX_2_17_X86_64,
+            Platform.MANYLINUX_2_17_AARCH64,
+            Platform.MACOSX_10_9_X86_64,
+            Platform.MACOSX_11_0_ARM64
+        }
+        if v not in allowed_platforms:
+            raise ValueError(f"Platform must be one of: {', '.join(p.value for p in allowed_platforms)}")
+        return v
+
+    @field_validator('suffix')
+    @classmethod
+    def validate_suffix(cls, v: str) -> str:
+        """Validate suffix to prevent command injection"""
+        if not v:
+            raise ValueError("Suffix cannot be empty")
+        if len(v) > 50:
+            raise ValueError("Suffix must be 50 characters or less")
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError("Suffix can only contain alphanumeric characters, underscores, and hyphens")
+        return v
+
 
 class MarketplaceTaskCreate(BaseModel):
     author: str = Field(..., description="Plugin author")
@@ -34,6 +64,35 @@ class MarketplaceTaskCreate(BaseModel):
     version: str = Field(..., description="Plugin version")
     platform: Platform = Field(Platform.DEFAULT, description="Target platform for repackaging")
     suffix: str = Field("offline", description="Suffix for the output file")
+
+    @field_validator('platform')
+    @classmethod
+    def validate_platform(cls, v: Platform) -> Platform:
+        """Validate platform against whitelist of allowed values"""
+        allowed_platforms = {
+            Platform.DEFAULT,
+            Platform.MANYLINUX2014_X86_64,
+            Platform.MANYLINUX2014_AARCH64,
+            Platform.MANYLINUX_2_17_X86_64,
+            Platform.MANYLINUX_2_17_AARCH64,
+            Platform.MACOSX_10_9_X86_64,
+            Platform.MACOSX_11_0_ARM64
+        }
+        if v not in allowed_platforms:
+            raise ValueError(f"Platform must be one of: {', '.join(p.value for p in allowed_platforms)}")
+        return v
+
+    @field_validator('suffix')
+    @classmethod
+    def validate_suffix(cls, v: str) -> str:
+        """Validate suffix to prevent command injection"""
+        if not v:
+            raise ValueError("Suffix cannot be empty")
+        if len(v) > 50:
+            raise ValueError("Suffix must be 50 characters or less")
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError("Suffix can only contain alphanumeric characters, underscores, and hyphens")
+        return v
 
 
 class TaskResponse(BaseModel):
