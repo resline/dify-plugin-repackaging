@@ -49,7 +49,7 @@ export function configureAxiosDefaults(): void {
       // Handle 401 Unauthorized - clear token and trigger re-login
       if (error.response && error.response.status === 401) {
         localStorage.removeItem(AUTH_TOKEN_KEY);
-        // Dispatch custom event to notify AuthProvider
+        // Dispatch custom event to notify AuthProvider (no detail to ensure string-only authError)
         window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       }
 

@@ -155,8 +155,7 @@ async def verify_authentication(request: Request) -> bool:
             auth_rate_limiter.record_attempt(client_id)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication token",
-                headers={"WWW-Authenticate": "Bearer"}
+                detail="Invalid authentication token"
             )
 
     # Method 2: Check HTTP Basic Auth
@@ -174,8 +173,7 @@ async def verify_authentication(request: Request) -> bool:
                 auth_rate_limiter.record_attempt(client_id)
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid credentials",
-                    headers={"WWW-Authenticate": 'Basic realm="Dify Plugin Repackaging"'}
+                    detail="Invalid credentials"
                 )
 
     # No authentication provided
@@ -183,8 +181,7 @@ async def verify_authentication(request: Request) -> bool:
     auth_rate_limiter.record_attempt(client_id)
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required. Provide X-Auth-Token header or HTTP Basic Auth.",
-        headers={"WWW-Authenticate": 'Basic realm="Dify Plugin Repackaging"'}
+        detail="Authentication required. Provide X-Auth-Token header or HTTP Basic Auth."
     )
 
 

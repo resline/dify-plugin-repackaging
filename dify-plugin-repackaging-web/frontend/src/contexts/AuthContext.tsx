@@ -50,14 +50,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Listen for unauthorized events from axios interceptor
   useEffect(() => {
-    const handleUnauthorized = () => {
+    const handleUnauthorized = (event?: CustomEvent) => {
       setToken(null);
-      setAuthError('Invalid password. Please try again.');
+      // Ensure authError is always a string
+      const message = typeof event?.detail === 'string'
+        ? event.detail
+        : 'Invalid password. Please try again.';
+      setAuthError(message);
     };
 
-    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    window.addEventListener('auth:unauthorized', handleUnauthorized as EventListener);
     return () => {
-      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+      window.removeEventListener('auth:unauthorized', handleUnauthorized as EventListener);
     };
   }, []);
 
