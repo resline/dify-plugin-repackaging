@@ -1,5 +1,7 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
+const AUTH_TOKEN_KEY = 'auth_token';
+
 interface RetryConfig {
   maxRetries?: number;
   initialDelay?: number;
@@ -105,6 +107,32 @@ export function createAxiosWithRetry(
 ) {
   const instance = axios.create(axiosConfig);
   const mergedRetryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+
+  // Add auth token interceptor - reads token from localStorage on each request
+  instance.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (token && config.headers) {
+        config.headers['X-Auth-Token'] = token;
+      }
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
+
+  // Add 401 handler interceptor
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      // Handle 401 Unauthorized - clear token and trigger re-login
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        // Dispatch custom event to notify AuthProvider
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      }
+      return Promise.reject(error);
+    }
+  );
 
   // Add retry interceptor
   instance.interceptors.response.use(

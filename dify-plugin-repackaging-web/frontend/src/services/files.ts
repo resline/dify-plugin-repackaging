@@ -1,7 +1,6 @@
 import api from './api';
 import type { FileInfo, FileListResponse } from '../types/file';
-import axios from 'axios';
-import { withErrorHandling, logError } from './utils/errorHandler';
+import { withErrorHandling } from './utils/errorHandler';
 
 const API_BASE_URL = '/api/v1';
 
