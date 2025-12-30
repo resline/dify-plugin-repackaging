@@ -3,16 +3,12 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
-// Defer utility imports to avoid initialization issues
-setTimeout(() => {
-  import('./services/utils/axiosDefaults').then(({ configureAxiosDefaults }) => {
-    configureAxiosDefaults();
-  });
-  
-  import('./utils/globalErrorHandler').then(({ installGlobalErrorHandlers }) => {
-    installGlobalErrorHandlers();
-  });
-}, 0);
+// Import and configure axios defaults synchronously to ensure auth interceptors are ready
+import { configureAxiosDefaults } from './services/utils/axiosDefaults';
+import { installGlobalErrorHandlers } from './utils/globalErrorHandler';
+
+configureAxiosDefaults();
+installGlobalErrorHandlers();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

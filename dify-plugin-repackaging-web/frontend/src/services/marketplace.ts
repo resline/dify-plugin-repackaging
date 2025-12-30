@@ -1,6 +1,5 @@
-import axios, { AxiosError } from 'axios';
 import { createAxiosWithRetry } from './utils/retry';
-import { withErrorHandling, toApiError, logError, getUserFriendlyErrorMessage } from './utils/errorHandler';
+import { withErrorHandling, toApiError } from './utils/errorHandler';
 
 const API_BASE_URL = '/api/v1';
 
