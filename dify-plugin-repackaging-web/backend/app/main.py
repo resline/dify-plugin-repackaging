@@ -28,11 +28,13 @@ logging.getLogger("httpx").setLevel(logging.INFO)
 # Create rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Create FastAPI app
+# SEC-021: Disable OpenAPI docs in production (only enable in debug mode)
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DEBUG else None,
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
 )
 
 # Add rate limiter to app state
@@ -49,13 +51,13 @@ app.add_middleware(JSONResponseMiddleware)
 app.add_middleware(ErrorHandlingMiddleware)
 app.add_middleware(RequestValidationMiddleware)
 
-# Set up CORS - should be added last to work properly
+# SEC-017: Set up CORS with restricted methods and headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Auth-Token", "X-Request-ID"],
 )
 
 # Include routers

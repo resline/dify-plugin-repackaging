@@ -81,8 +81,8 @@ class FileManager:
             Dict with files list and pagination info
         """
         try:
-            # Get all task keys
-            all_keys = redis_client.keys("task:*")
+            # SEC-016: Use SCAN instead of KEYS to avoid blocking Redis
+            all_keys = list(redis_client.scan_iter("task:*", count=100))
             
             # Filter completed tasks with files
             completed_files = []

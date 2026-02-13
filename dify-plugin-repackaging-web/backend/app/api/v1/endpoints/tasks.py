@@ -357,8 +357,8 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
         raise
     except Exception as e:
         logger.exception("Error creating task")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/tasks/marketplace", response_model=TaskResponse)
@@ -458,8 +458,8 @@ async def create_marketplace_task(request: Request, task_data: MarketplaceTaskCr
         )
     except Exception as e:
         logger.exception("Error creating marketplace task")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/tasks/upload", response_model=TaskResponse)
@@ -590,8 +590,8 @@ async def upload_task(
         raise
     except Exception as e:
         logger.exception("Error creating upload task")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 
@@ -611,8 +611,10 @@ async def list_completed_tasks(limit: int = Query(default=10, ge=1, le=100)):
     - List of completed tasks with download URLs
     """
     try:
-        # Get all task keys from Redis
-        keys = redis_client.keys("task:*")
+        # SEC-016: Use SCAN instead of KEYS to avoid blocking Redis
+        keys = []
+        for key in redis_client.scan_iter("task:*", count=100):
+            keys.append(key)
         completed_tasks = []
         
         for key in keys:
@@ -651,8 +653,8 @@ async def list_completed_tasks(limit: int = Query(default=10, ge=1, le=100)):
         }
     except Exception as e:
         logger.exception("Error listing completed tasks")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
@@ -712,44 +714,30 @@ async def download_result(task_id: str):
         # Check if output file exists
         output_filename = task.get("output_filename")
         if not output_filename:
-            logger.error(f"No output filename in task data: {task}")
+            logger.error(f"No output filename in task data for task: {task_id}")
             raise HTTPException(status_code=404, detail="Output file not found")
-        
-        # Log environment info
-        logger.info(f"TEMP_DIR setting: {settings.TEMP_DIR}")
-        logger.info(f"Output filename: {output_filename}")
-        
-        # Build file path
-        file_path = os.path.join(settings.TEMP_DIR, task_id, output_filename)
+
+        # SEC-010: Sanitize output_filename to prevent path traversal
+        output_filename = os.path.basename(output_filename)
+        if not output_filename:
+            raise HTTPException(status_code=404, detail="Invalid output filename")
+
+        # Build file path and verify it stays within task directory
+        task_dir = os.path.join(settings.TEMP_DIR, task_id)
+        file_path = os.path.abspath(os.path.join(task_dir, output_filename))
+        if not file_path.startswith(os.path.abspath(task_dir)):
+            raise HTTPException(status_code=403, detail="Access denied")
+
         logger.info(f"Looking for file at: {file_path}")
-        
-        # Check parent directory
-        parent_dir = os.path.dirname(file_path)
-        if not os.path.exists(parent_dir):
-            logger.error(f"Parent directory does not exist: {parent_dir}")
-            # Try to list temp directory
-            if os.path.exists(settings.TEMP_DIR):
-                logger.info(f"TEMP_DIR contents: {os.listdir(settings.TEMP_DIR)}")
-            else:
-                logger.error(f"TEMP_DIR does not exist: {settings.TEMP_DIR}")
+
+        if not os.path.exists(os.path.dirname(file_path)):
+            # SEC-022: Don't expose internal directory structure in error messages
             raise HTTPException(status_code=500, detail="Task directory not found")
-        
-        # List directory contents
-        logger.info(f"Task directory contents: {os.listdir(parent_dir)}")
-        
+
         if not os.path.exists(file_path):
             logger.error(f"File not found on disk: {file_path}")
-            # Check if file exists with different case
-            for fname in os.listdir(parent_dir):
-                logger.info(f"Found file: {fname} (looking for: {output_filename})")
-                if fname.lower() == output_filename.lower():
-                    logger.warning(f"File exists with different case: {fname}")
             raise HTTPException(status_code=404, detail="File not found on server")
-        
-        # Check file permissions
-        file_stat = os.stat(file_path)
-        logger.info(f"File permissions: {oct(file_stat.st_mode)}, size: {file_stat.st_size}")
-        
+
         logger.info(f"Serving file: {file_path}")
         return FileResponse(
             file_path,
@@ -760,15 +748,15 @@ async def download_result(task_id: str):
         raise
     except Exception as e:
         logger.exception(f"Unexpected error in download_result: {e}")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/tasks")
 async def list_recent_tasks(limit: int = 10):
     """List recent tasks (for demo purposes)"""
-    # This is a simple implementation - in production, you'd want proper storage
-    keys = redis_client.keys("task:*")
+    # SEC-016: Use SCAN instead of KEYS to avoid blocking Redis
+    keys = list(redis_client.scan_iter("task:*", count=100))
     tasks = []
     
     for key in keys[:limit]:

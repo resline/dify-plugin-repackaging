@@ -83,3 +83,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# SEC-012: Warn if authentication is disabled
+import logging as _logging
+_config_logger = _logging.getLogger(__name__)
+if not settings.AUTH_PASSWORD:
+    _config_logger.warning(
+        "SECURITY WARNING: AUTH_PASSWORD is not set. "
+        "Authentication is DISABLED. Set AUTH_PASSWORD environment variable for production use."
+    )

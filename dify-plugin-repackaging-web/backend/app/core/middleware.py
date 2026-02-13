@@ -99,11 +99,11 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             logger.exception(f"Unhandled exception for {request.url.path}")
             
-            # Return properly formatted error response
+            # SEC-022: Return generic error response without internal details
             return JSONResponse(
                 content={
                     "error": "Internal server error",
-                    "detail": str(e),
+                    "detail": "An unexpected error occurred",
                     "path": str(request.url.path),
                     "method": request.method,
                     "timestamp": datetime.utcnow().isoformat()
