@@ -357,8 +357,8 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
         raise
     except Exception as e:
         logger.exception("Error creating task")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/tasks/marketplace", response_model=TaskResponse)
@@ -458,8 +458,8 @@ async def create_marketplace_task(request: Request, task_data: MarketplaceTaskCr
         )
     except Exception as e:
         logger.exception("Error creating marketplace task")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/tasks/upload", response_model=TaskResponse)
@@ -590,8 +590,8 @@ async def upload_task(
         raise
     except Exception as e:
         logger.exception("Error creating upload task")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 
@@ -653,8 +653,8 @@ async def list_completed_tasks(limit: int = Query(default=10, ge=1, le=100)):
         }
     except Exception as e:
         logger.exception("Error listing completed tasks")
-        error_msg = getattr(e, 'message', str(e)) if hasattr(e, 'message') else str(type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
+        # SEC-022: Don't expose internal error details to clients
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
