@@ -106,14 +106,16 @@ def get_client_identifier(request: Request) -> str:
     """
     Get a unique identifier for the client for rate limiting.
     Uses IP address as the primary identifier.
-    """
-    # Try to get real IP from X-Forwarded-For header (if behind proxy)
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        # Take the first IP in the chain
-        return forwarded_for.split(',')[0].strip()
 
-    # Fall back to direct client IP
+    SEC-013: Only trust X-Real-IP set by nginx (trusted proxy),
+    NOT X-Forwarded-For which can be spoofed by clients.
+    """
+    # Prefer X-Real-IP set by nginx (trusted proxy)
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
+
+    # Fall back to direct client IP (do NOT trust X-Forwarded-For from untrusted sources)
     if request.client:
         return request.client.host
 

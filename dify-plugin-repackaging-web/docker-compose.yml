@@ -4,12 +4,13 @@ services:
   redis:
     image: redis:7-alpine
     container_name: dify-plugin-redis
-    ports:
-      - "6379:6379"
+    # SEC-003: Redis password authentication and no exposed port
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme-in-production}
+    # Port removed - only internal network access
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme-in-production}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -25,14 +26,13 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - REDIS_PASSWORD=
-      - DEBUG=True
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme-in-production}@redis:6379/0
+      - DEBUG=False
       - TEMP_DIR=/app/temp
       - UPLOAD_DIR=/app/uploads
       - BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:80","http://frontend:80"]
-      # Authentication password - leave empty to disable authentication
-      # - AUTH_PASSWORD=your-secure-password
+      # SEC-012: Authentication password - REQUIRED for production
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-changeme-in-production}
     volumes:
       - ./backend/app:/app/app
       - ./backend/scripts:/app/scripts
@@ -56,9 +56,8 @@ services:
     container_name: dify-plugin-celery
     command: celery -A app.workers.celery_app worker --loglevel=info
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - REDIS_PASSWORD=
-      - DEBUG=True
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme-in-production}@redis:6379/0
+      - DEBUG=False
       - TEMP_DIR=/app/temp
       - UPLOAD_DIR=/app/uploads
     volumes:

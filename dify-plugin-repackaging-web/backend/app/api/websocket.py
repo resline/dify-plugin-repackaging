@@ -148,9 +148,25 @@ async def broadcast_marketplace_selection(plugin_metadata: dict):
 @router.websocket("/ws/tasks/{task_id}")
 async def websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time task updates"""
+    # SEC-020: Validate authentication for WebSocket connections
+    if settings.AUTH_PASSWORD:
+        auth_token = websocket.query_params.get("token", "")
+        if not auth_token:
+            # Check headers as fallback
+            auth_token = websocket.headers.get("x-auth-token", "")
+        if not auth_token:
+            logger.warning(f"WebSocket connection rejected: no auth token for task {task_id}")
+            await websocket.close(code=1008, reason="Authentication required")
+            return
+        from app.core.security import verify_password
+        if not verify_password(auth_token):
+            logger.warning(f"WebSocket connection rejected: invalid auth token for task {task_id}")
+            await websocket.close(code=1008, reason="Invalid authentication")
+            return
+
     # Create Redis client to check if task exists
     redis_client = await redis.from_url(settings.REDIS_URL, decode_responses=True)
-    
+
     try:
         # Validate that task exists before accepting connection
         task_data = await redis_client.get(f"task:{task_id}")

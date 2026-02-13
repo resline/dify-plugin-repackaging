@@ -13,14 +13,24 @@ else
     exit 1
 fi
 
-# Start Redis in background
+# SEC-003: Start Redis with password authentication
 echo "Starting Redis server..."
-redis-server --daemonize yes
+REDIS_PASSWORD="${REDIS_PASSWORD:-}"
+if [ -n "$REDIS_PASSWORD" ]; then
+    redis-server --daemonize yes --requirepass "$REDIS_PASSWORD"
+else
+    echo "WARNING: Redis starting without password authentication"
+    redis-server --daemonize yes
+fi
 
 # Wait for Redis to be ready
 echo "Waiting for Redis..."
 counter=0
-while ! redis-cli ping > /dev/null 2>&1; do
+REDIS_AUTH_FLAG=""
+if [ -n "$REDIS_PASSWORD" ]; then
+    REDIS_AUTH_FLAG="-a $REDIS_PASSWORD"
+fi
+while ! redis-cli $REDIS_AUTH_FLAG ping > /dev/null 2>&1; do
     counter=$((counter+1))
     if [ $counter -gt 30 ]; then
         echo "ERROR: Redis failed to start after 30 seconds"

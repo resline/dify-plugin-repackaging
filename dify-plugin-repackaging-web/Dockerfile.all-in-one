@@ -33,12 +33,16 @@ COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Create scripts directory and download dify-plugin binaries
+# SEC-005: Create scripts directory and download dify-plugin binaries with checksum verification
+# Pin to specific commit SHA for reproducibility
+ARG DIFY_PLUGIN_COMMIT=main
 RUN mkdir -p /app/scripts && \
     cd /app/scripts && \
-    wget -q https://github.com/resline/dify-plugin-repackaging/raw/main/dify-plugin-linux-amd64-5g && \
-    wget -q https://github.com/resline/dify-plugin-repackaging/raw/main/plugin_repackaging.sh && \
+    wget -q https://github.com/resline/dify-plugin-repackaging/raw/${DIFY_PLUGIN_COMMIT}/dify-plugin-linux-amd64-5g && \
+    wget -q https://github.com/resline/dify-plugin-repackaging/raw/${DIFY_PLUGIN_COMMIT}/plugin_repackaging.sh && \
     chmod +x dify-plugin-linux-amd64-5g plugin_repackaging.sh
+# TODO: Add SHA256 verification once checksums are published:
+# RUN echo "<sha256hash>  /app/scripts/dify-plugin-linux-amd64-5g" | sha256sum -c -
 
 # Create Redis config for persistence
 RUN mkdir -p /var/lib/redis && \
@@ -147,7 +151,9 @@ http {\n\
         # Security headers\n\
         add_header X-Frame-Options "SAMEORIGIN" always;\n\
         add_header X-Content-Type-Options "nosniff" always;\n\
-        add_header X-XSS-Protection "1; mode=block" always;\n\
+        add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"'; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' https://marketplace.dify.ai data:; connect-src '"'"'self'"'"' wss: ws:; frame-ancestors '"'"'self'"'"'" always;\n\
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;\n\
         \n\
         location / {\n\
             root /usr/share/nginx/html;\n\

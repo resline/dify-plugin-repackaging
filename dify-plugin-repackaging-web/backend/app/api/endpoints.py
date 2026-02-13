@@ -195,13 +195,21 @@ async def download_result(task_id: str):
     output_filename = task.get("output_filename")
     if not output_filename:
         raise HTTPException(status_code=404, detail="Output file not found")
-    
-    # Build file path
-    file_path = os.path.join(settings.TEMP_DIR, task_id, output_filename)
-    
+
+    # SEC-010: Sanitize output_filename to prevent path traversal
+    output_filename = os.path.basename(output_filename)
+    if not output_filename:
+        raise HTTPException(status_code=404, detail="Invalid output filename")
+
+    # Build file path and verify it stays within task directory
+    task_dir = os.path.join(settings.TEMP_DIR, task_id)
+    file_path = os.path.abspath(os.path.join(task_dir, output_filename))
+    if not file_path.startswith(os.path.abspath(task_dir)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on server")
-    
+
     return FileResponse(
         file_path,
         media_type="application/octet-stream",
@@ -212,8 +220,8 @@ async def download_result(task_id: str):
 @router.get("/tasks")
 async def list_recent_tasks(limit: int = 10):
     """List recent tasks (for demo purposes)"""
-    # This is a simple implementation - in production, you'd want proper storage
-    keys = redis_client.keys("task:*")
+    # SEC-016: Use SCAN instead of KEYS to avoid blocking Redis
+    keys = list(redis_client.scan_iter("task:*", count=100))
     tasks = []
     
     for key in keys[:limit]:

@@ -1,4 +1,5 @@
-FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.12-slim
+# SEC-004: Use official Docker image instead of third-party mirror
+FROM python:3.12-slim
 
 # 设置apt国内源
 RUN echo "deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \

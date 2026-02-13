@@ -22,7 +22,8 @@ class DownloadService:
         if domain.startswith("www."):
             domain = domain[4:]
         
-        return any(domain.endswith(allowed) for allowed in settings.ALLOWED_DOWNLOAD_DOMAINS)
+        # SEC-011: Exact match or proper subdomain match (prevent evil-github.com matching github.com)
+        return any(domain == allowed or domain.endswith("." + allowed) for allowed in settings.ALLOWED_DOWNLOAD_DOMAINS)
     
     @staticmethod
     async def check_file_size(url: str) -> Optional[int]:

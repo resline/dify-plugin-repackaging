@@ -1,5 +1,16 @@
 #!/bin/bash
 # author: Junjie.M
+set -euo pipefail
+
+# SEC-025: Cleanup temporary files on failure
+CLEANUP_DIR=""
+cleanup() {
+	if [[ -n "$CLEANUP_DIR" && -d "$CLEANUP_DIR" ]]; then
+		echo "Cleaning up temporary directory: ${CLEANUP_DIR}"
+		rm -rf "$CLEANUP_DIR"
+	fi
+}
+trap cleanup EXIT
 
 DEFAULT_GITHUB_API_URL=https://github.com
 DEFAULT_MARKETPLACE_API_URL=https://marketplace.dify.ai
@@ -105,8 +116,24 @@ repackage(){
 	local PACKAGE_PATH="$1"
 	PACKAGE_NAME_WITH_EXTENSION=$(basename "${PACKAGE_PATH}")
 	PACKAGE_NAME="${PACKAGE_NAME_WITH_EXTENSION%.*}"
+	# SEC-025: Register extraction directory for cleanup on failure
+	CLEANUP_DIR="${CURR_DIR}/${PACKAGE_NAME}"
 	echo "Unziping ..."
 	install_unzip
+
+	# SEC-002: Validate ZIP entries for path traversal (Zip Slip protection)
+	if zipinfo -1 "${PACKAGE_PATH}" | grep -qE '(^|/)\.\.(/|$)'; then
+		echo "Error: Archive contains path traversal entries. Aborting."
+		exit 1
+	fi
+	# SEC-015: Check uncompressed size to prevent zip bombs (max 500MB)
+	local UNCOMPRESSED_SIZE
+	UNCOMPRESSED_SIZE=$(zipinfo -t "${PACKAGE_PATH}" 2>/dev/null | grep -oP '\d+(?= bytes)' | tail -1)
+	if [[ -n "$UNCOMPRESSED_SIZE" ]] && [[ "$UNCOMPRESSED_SIZE" -gt 524288000 ]]; then
+		echo "Error: Archive uncompressed size exceeds 500MB limit. Aborting."
+		exit 1
+	fi
+
 	unzip -o "${PACKAGE_PATH}" -d "${CURR_DIR}/${PACKAGE_NAME}"
 	if [[ $? -ne 0 ]]; then
 		echo "Unzip failed."
@@ -115,7 +142,16 @@ repackage(){
 	echo "Unzip success."
 	echo "Repackaging ..."
 	cd "${CURR_DIR}/${PACKAGE_NAME}"
-	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url "${PIP_MIRROR_URL}" --trusted-host mirrors.aliyun.com
+
+	# SEC-009: Sanitize requirements.txt - remove dangerous pip directives
+	if [ -f requirements.txt ]; then
+		# Remove lines with pip options, VCS URLs, direct URLs, and editable installs
+		sed -i '/^[[:space:]]*--/d; /^[[:space:]]*-[efic]/d; /git+/d; /svn+/d; /hg+/d; /bzr+/d; /https\?:\/\//d; /ftp:\/\//d; /@[[:space:]]*http/d' requirements.txt
+	fi
+
+	# SEC-001: Always use --only-binary=:all: to prevent setup.py execution
+	# SEC-008: Removed --trusted-host to enforce SSL verification
+	pip download --only-binary=:all: ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url "${PIP_MIRROR_URL}"
 	if [[ $? -ne 0 ]]; then
 		echo "Pip download failed."
 		exit 1
