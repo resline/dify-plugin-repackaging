@@ -4,7 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Callable
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class JSONResponseMiddleware(BaseHTTPMiddleware):
                                     "error": "Invalid response format",
                                     "detail": "API returned HTML instead of JSON. This usually indicates an error or API change.",
                                     "path": str(request.url.path),
-                                    "timestamp": datetime.utcnow().isoformat()
+                                    "timestamp": datetime.now(timezone.utc).isoformat()
                                 },
                                 status_code=502  # Bad Gateway
                             )
@@ -64,7 +64,7 @@ class JSONResponseMiddleware(BaseHTTPMiddleware):
                         content={
                             "error": "Internal server error",
                             "detail": "Invalid response format",
-                            "timestamp": datetime.utcnow().isoformat()
+                            "timestamp": datetime.now(timezone.utc).isoformat()
                         },
                         status_code=500
                     )
@@ -75,7 +75,7 @@ class JSONResponseMiddleware(BaseHTTPMiddleware):
                         content={
                             "error": "Internal server error",
                             "detail": str(e),
-                            "timestamp": datetime.utcnow().isoformat()
+                            "timestamp": datetime.now(timezone.utc).isoformat()
                         },
                         status_code=500
                     )
@@ -106,7 +106,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
                     "detail": str(e),
                     "path": str(request.url.path),
                     "method": request.method,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 },
                 status_code=500,
                 headers={"content-type": "application/json"}

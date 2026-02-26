@@ -57,7 +57,7 @@ Python version: Should be as the same as the version in `dify-plugin-daemon` whi
 
 #### Clone
 ```shell
-git clone https://github.com/junjiem/dify-plugin-repackaging.git
+git clone https://github.com/resline/dify-plugin-repackaging.git
 ```
 
 
@@ -147,5 +147,5 @@ Visit the Dify platform's plugin management page, choose Local Package File to c
 
 ### Star history
 
-[![Star History Chart](https://api.star-history.com/svg?repos=junjiem/dify-plugin-repackaging&type=Date)](https://star-history.com/#junjiem/dify-plugin-repackaging&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=resline/dify-plugin-repackaging&type=Date)](https://star-history.com/#resline/dify-plugin-repackaging&Date)
 

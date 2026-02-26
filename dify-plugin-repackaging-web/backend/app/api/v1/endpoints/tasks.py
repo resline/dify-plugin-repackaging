@@ -13,11 +13,20 @@ import uuid
 import json
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import re
 
 logger = logging.getLogger(__name__)
+
+
+def validate_task_id(task_id: str) -> str:
+    """Validate task_id is a valid UUID format to prevent path traversal."""
+    uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+    if not uuid_pattern.match(task_id):
+        raise HTTPException(status_code=400, detail="Invalid task ID format")
+    return task_id
+
 
 # Create rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -296,7 +305,7 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
         task_record = {
             "task_id": task_id,
             "status": TaskStatus.PENDING.value,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "url": download_url,
             "platform": task_data.platform,
             "suffix": task_data.suffix,
@@ -344,7 +353,7 @@ async def create_task(request: Request, task_data: TaskCreateWithMarketplace):
         return TaskResponse(
             task_id=task_id,
             status=TaskStatus.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             progress=0
         )
         
@@ -407,7 +416,7 @@ async def create_marketplace_task(request: Request, task_data: MarketplaceTaskCr
         task_record = {
             "task_id": task_id,
             "status": TaskStatus.PENDING.value,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "url": download_url,
             "platform": task_data.platform.value,
             "suffix": task_data.suffix,
@@ -447,7 +456,7 @@ async def create_marketplace_task(request: Request, task_data: MarketplaceTaskCr
         return TaskResponse(
             task_id=task_id,
             status=TaskStatus.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             progress=0
         )
         
@@ -548,7 +557,7 @@ async def upload_task(
         task_record = {
             "task_id": task_id,
             "status": TaskStatus.PENDING.value,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "url": f"file://{file_path}",
             "platform": platform,
             "suffix": suffix,
@@ -582,7 +591,7 @@ async def upload_task(
         return TaskResponse(
             task_id=task_id,
             status=TaskStatus.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             progress=0
         )
         
@@ -612,7 +621,7 @@ async def list_completed_tasks(limit: int = Query(default=10, ge=1, le=100)):
     """
     try:
         # Get all task keys from Redis
-        keys = redis_client.keys("task:*")
+        keys = list(redis_client.scan_iter("task:*"))
         completed_tasks = []
         
         for key in keys:
@@ -658,6 +667,7 @@ async def list_completed_tasks(limit: int = Query(default=10, ge=1, le=100)):
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
 async def get_task_status(task_id: str):
     """Get the status of a repackaging task"""
+    validate_task_id(task_id)
     # Get task from Redis
     task_data = redis_client.get(f"task:{task_id}")
     
@@ -688,6 +698,7 @@ async def get_task_status(task_id: str):
 @router.get("/tasks/{task_id}/download")
 async def download_result(task_id: str):
     """Download the repackaged plugin file"""
+    validate_task_id(task_id)
     try:
         logger.info(f"Download request for task: {task_id}")
         
@@ -768,7 +779,7 @@ async def download_result(task_id: str):
 async def list_recent_tasks(limit: int = 10):
     """List recent tasks (for demo purposes)"""
     # This is a simple implementation - in production, you'd want proper storage
-    keys = redis_client.keys("task:*")
+    keys = list(redis_client.scan_iter("task:*"))
     tasks = []
     
     for key in keys[:limit]:

@@ -340,6 +340,7 @@ jobs:
         continue-on-error: true
         run: |
           pip install -r requirements.txt
+          mkdir -p security-results
           safety check --json > security-results/safety-report.json
 
       - name: Run bandit security scan

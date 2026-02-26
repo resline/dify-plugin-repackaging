@@ -4,7 +4,7 @@ import redis.asyncio as redis
 import json
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import time
 
@@ -115,7 +115,7 @@ async def broadcast_marketplace_selection(plugin_metadata: dict):
     message = {
         "type": "marketplace_selection",
         "plugin": plugin_metadata,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
     
     # Broadcast to all connected clients across all tasks

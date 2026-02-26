@@ -169,7 +169,7 @@ class TestFileManagerListOperations:
     def test_list_completed_files_empty(self, mock_redis, mock_settings):
         """Test listing files when none exist."""
         mock_settings.TEMP_DIR = "/tmp"
-        mock_redis.keys.return_value = []
+        mock_redis.scan_iter.return_value = []
         
         result = FileManager.list_completed_files()
         
@@ -185,7 +185,7 @@ class TestFileManagerListOperations:
         
         # Create 5 task keys
         task_keys = [f"task:{i}" for i in range(5)]
-        mock_redis.keys.return_value = task_keys
+        mock_redis.scan_iter.return_value = task_keys
         
         # Mock task data for each
         def get_side_effect(key):
@@ -221,7 +221,7 @@ class TestFileManagerListOperations:
         mock_settings.TEMP_DIR = "/tmp"
         
         task_keys = ["task:complete", "task:processing", "task:failed"]
-        mock_redis.keys.return_value = task_keys
+        mock_redis.scan_iter.return_value = task_keys
         
         def get_side_effect(key):
             task_id = key.split(":")[1]
@@ -315,7 +315,7 @@ class TestFileManagerCleanup:
         mock_settings.FILE_RETENTION_DAYS = 7
         
         task_keys = ["task:new1", "task:new2"]
-        mock_redis.keys.return_value = task_keys
+        mock_redis.scan_iter.return_value = task_keys
         
         # All tasks are recent
         recent_time = datetime.utcnow() - timedelta(days=1)
@@ -337,7 +337,7 @@ class TestFileManagerCleanup:
         mock_settings.TEMP_DIR = "/tmp"
         
         task_keys = ["task:old", "task:new"]
-        mock_redis.keys.return_value = task_keys
+        mock_redis.scan_iter.return_value = task_keys
         
         def get_side_effect(key):
             task_id = key.split(":")[1]

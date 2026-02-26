@@ -7,8 +7,6 @@ python-multipart==0.0.21
 websockets==14.2
 pydantic==2.10.6
 pydantic-settings==2.7.1
-python-jose[cryptography]==3.5.0
-passlib[bcrypt]==1.7.4
 slowapi==0.1.9
 aiofiles==24.1.0
 beautifulsoup4==4.12.3

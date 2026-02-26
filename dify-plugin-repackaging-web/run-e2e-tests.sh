@@ -50,14 +50,12 @@ docker-compose ps
 # Run E2E tests
 echo ""
 echo "🧪 Running E2E tests..."
+TEST_EXIT_CODE=0
 docker-compose run --rm \
     -e PLAYWRIGHT_BASE_URL=http://frontend:80 \
     -e CI=true \
     playwright \
-    sh -c "npm install && npx playwright test --reporter=list"
-
-# Capture exit code
-TEST_EXIT_CODE=$?
+    sh -c "npm install && npx playwright test --reporter=list" || TEST_EXIT_CODE=$?
 
 # Copy test results
 if [ -d "playwright-results" ]; then
