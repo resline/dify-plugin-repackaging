@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Set
 import asyncio
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import WebSocket, WebSocketDisconnect
 import json
 
@@ -96,7 +96,7 @@ class WebSocketManager:
                 'last_pong': time.time(),
                 'ping_count': 0,
                 'pong_count': 0,
-                'connected_at': datetime.utcnow().isoformat()
+                'connected_at': datetime.now(timezone.utc).isoformat()
             }
             
             logger.info(f"WebSocket connected to channel {channel_id}")

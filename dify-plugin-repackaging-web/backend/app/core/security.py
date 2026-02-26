@@ -105,18 +105,10 @@ def verify_password(provided_password: str) -> bool:
 def get_client_identifier(request: Request) -> str:
     """
     Get a unique identifier for the client for rate limiting.
-    Uses IP address as the primary identifier.
+    Uses direct client IP to prevent spoofing via X-Forwarded-For.
     """
-    # Try to get real IP from X-Forwarded-For header (if behind proxy)
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        # Take the first IP in the chain
-        return forwarded_for.split(',')[0].strip()
-
-    # Fall back to direct client IP
     if request.client:
         return request.client.host
-
     return "unknown"
 
 

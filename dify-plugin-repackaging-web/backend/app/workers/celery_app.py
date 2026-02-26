@@ -3,7 +3,7 @@ from app.core.config import settings
 import redis
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from app.services.download import DownloadService
 from app.services.repackage import RepackageService
 from app.models.task import TaskStatus
@@ -51,7 +51,7 @@ def update_task_status(task_id: str, status: TaskStatus, progress: int = 0,
         "status": status.value,
         "progress": progress,
         "message": message,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     })
     
     if error is not None:
@@ -66,7 +66,7 @@ def update_task_status(task_id: str, status: TaskStatus, progress: int = 0,
         task_data["marketplace_metadata"] = marketplace_metadata
     
     if status == TaskStatus.COMPLETED:
-        task_data["completed_at"] = datetime.utcnow().isoformat()
+        task_data["completed_at"] = datetime.now(timezone.utc).isoformat()
         # Generate download URL if output file exists
         if output_filename:
             task_data["download_url"] = f"/api/v1/tasks/{task_id}/download"

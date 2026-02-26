@@ -4,7 +4,7 @@ File management service for handling completed files
 import os
 import json
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from app.core.config import settings
 from app.workers.celery_app import redis_client
@@ -38,7 +38,14 @@ class FileManager:
             
             # Build file path
             file_path = os.path.join(settings.TEMP_DIR, task_id, task["output_filename"])
-            
+
+            # Validate path to prevent traversal
+            abs_temp = os.path.abspath(settings.TEMP_DIR)
+            abs_path = os.path.abspath(file_path)
+            if not abs_path.startswith(abs_temp + os.sep):
+                logger.warning(f"Path traversal attempt detected: {task_id}")
+                return None
+
             # Check if file exists
             if not os.path.exists(file_path):
                 logger.warning(f"File not found: {file_path}")
@@ -82,7 +89,7 @@ class FileManager:
         """
         try:
             # Get all task keys
-            all_keys = redis_client.keys("task:*")
+            all_keys = list(redis_client.scan_iter("task:*"))
             
             # Filter completed tasks with files
             completed_files = []
@@ -142,10 +149,17 @@ class FileManager:
             return None
         
         file_path = os.path.join(settings.TEMP_DIR, file_id, file_info["filename"])
-        
+
+        # Validate path to prevent traversal
+        abs_temp = os.path.abspath(settings.TEMP_DIR)
+        abs_path = os.path.abspath(file_path)
+        if not abs_path.startswith(abs_temp + os.sep):
+            logger.warning(f"Path traversal attempt detected: {file_id}")
+            return None
+
         if os.path.exists(file_path):
             return file_path
-        
+
         return None
     
     @staticmethod
@@ -162,7 +176,7 @@ class FileManager:
         if retention_days is None:
             retention_days = settings.FILE_RETENTION_DAYS
         
-        cutoff_time = datetime.utcnow() - timedelta(days=retention_days)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(days=retention_days)
         cleaned_count = 0
         
         try:
@@ -173,7 +187,14 @@ class FileManager:
             # Iterate through task directories
             for task_dir in os.listdir(temp_dir):
                 dir_path = os.path.join(temp_dir, task_dir)
-                
+
+                # Validate path to prevent traversal
+                abs_temp = os.path.abspath(temp_dir)
+                abs_dir = os.path.abspath(dir_path)
+                if not abs_dir.startswith(abs_temp + os.sep):
+                    logger.warning(f"Path traversal attempt detected in cleanup: {task_dir}")
+                    continue
+
                 if os.path.isdir(dir_path):
                     # Check directory modification time
                     mtime = datetime.fromtimestamp(os.path.getmtime(dir_path))
@@ -228,7 +249,14 @@ class FileManager:
             
             # Build directory path
             task_dir = os.path.join(settings.TEMP_DIR, task_id)
-            
+
+            # Validate path to prevent traversal
+            abs_temp = os.path.abspath(settings.TEMP_DIR)
+            abs_path = os.path.abspath(task_dir)
+            if not abs_path.startswith(abs_temp + os.sep):
+                logger.warning(f"Path traversal attempt detected: {task_id}")
+                return False
+
             # Delete the directory and all its contents
             if os.path.exists(task_dir):
                 shutil.rmtree(task_dir)

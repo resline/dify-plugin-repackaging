@@ -501,7 +501,7 @@ class TestListRecentTasksEndpoint:
     async def test_list_recent_tasks_empty(self, async_client: AsyncClient, mock_redis):
         """Test listing tasks when none exist."""
         # Arrange
-        mock_redis.keys.return_value = []
+        mock_redis.scan_iter.return_value = []
         
         with patch('app.api.v1.endpoints.tasks.redis_client', mock_redis):
             # Act
@@ -517,7 +517,7 @@ class TestListRecentTasksEndpoint:
         """Test listing tasks that include plugin info."""
         # Arrange
         task_keys = ["task:123", "task:456"]
-        mock_redis.keys.return_value = task_keys
+        mock_redis.scan_iter.return_value = task_keys
         
         tasks_data = [
             {
@@ -562,7 +562,7 @@ class TestListCompletedTasksEndpoint:
         # Arrange
         task_id = "test-123"
         task_keys = [f"task:{task_id}"]
-        mock_redis.keys.return_value = task_keys
+        mock_redis.scan_iter.return_value = task_keys
         
         output_filename = "plugin-offline.difypkg"
         task_data = {
@@ -605,7 +605,7 @@ class TestListCompletedTasksEndpoint:
         """Test listing completed tasks when output file is missing."""
         # Arrange
         task_keys = ["task:missing-file"]
-        mock_redis.keys.return_value = task_keys
+        mock_redis.scan_iter.return_value = task_keys
         
         task_data = {
             "task_id": "missing-file",
@@ -629,7 +629,7 @@ class TestListCompletedTasksEndpoint:
     async def test_list_completed_tasks_exception(self, async_client: AsyncClient, mock_redis):
         """Test handling exceptions in list_completed_tasks."""
         # Arrange
-        mock_redis.keys.side_effect = Exception("Redis error")
+        mock_redis.scan_iter.side_effect = Exception("Redis error")
         
         with patch('app.api.v1.endpoints.tasks.redis_client', mock_redis):
             # Act

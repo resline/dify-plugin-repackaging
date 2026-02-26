@@ -38,10 +38,8 @@ docker-compose -f docker-compose-test.yml ps
 # Run E2E tests
 echo ""
 echo "🧪 Running E2E tests..."
-docker-compose -f docker-compose-test.yml run --rm playwright-test
-
-# Capture exit code
-TEST_EXIT_CODE=$?
+TEST_EXIT_CODE=0
+docker-compose -f docker-compose-test.yml run --rm playwright-test || TEST_EXIT_CODE=$?
 
 # Clean up
 echo ""

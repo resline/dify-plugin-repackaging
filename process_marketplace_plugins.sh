@@ -50,7 +50,7 @@ echo -e "${GREEN}Using suffix: ${SUFFIX}${NC}"
 echo "Platform: ${PLATFORM}, Suffix: ${SUFFIX}" >> "${LOG_FILE}"
 
 # Process each file
-find "${MARKETPLACE_DIR}" -name "*.difypkg" -type f | while read -r plugin_file; do
+while read -r plugin_file; do
     FILENAME=$(basename "${plugin_file}")
     echo -e "\n${YELLOW}Processing: ${FILENAME}${NC}"
     echo -e "\nProcessing: ${FILENAME}" >> "${LOG_FILE}"
@@ -85,7 +85,7 @@ find "${MARKETPLACE_DIR}" -name "*.difypkg" -type f | while read -r plugin_file;
         echo -e "${RED}✗ Failed to process: ${FILENAME}${NC}"
         echo "✗ Failed to process: ${FILENAME}" >> "${LOG_FILE}"
     fi
-done
+done < <(find "${MARKETPLACE_DIR}" -name "*.difypkg" -type f)
 
 # Summary
 echo -e "\n${GREEN}=== Processing Complete ===${NC}"

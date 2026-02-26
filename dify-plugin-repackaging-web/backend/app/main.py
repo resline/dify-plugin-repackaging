@@ -170,10 +170,10 @@ async def health_check():
             "version": settings.APP_VERSION
         }
     except Exception as e:
-        return {
-            "status": "unhealthy", 
-            "error": str(e)
-        }
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "error": str(e)}
+        )
 
 
 if __name__ == "__main__":

@@ -235,7 +235,7 @@ class TestTasksEndpoint:
         """Test getting all tasks with pagination."""
         # Arrange
         task_keys = [f"task:{uuid.uuid4()}" for _ in range(5)]
-        mock_redis.keys.return_value = task_keys
+        mock_redis.scan_iter.return_value = task_keys
         
         # Mock task data for each key
         def mock_get(key):

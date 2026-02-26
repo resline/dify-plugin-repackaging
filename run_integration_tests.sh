@@ -123,23 +123,24 @@ fi
 
 # Execute tests in test runner container
 log_info "Executing: $PYTEST_CMD"
-docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME run --rm test-runner $PYTEST_CMD
+TEST_EXIT_CODE=0
+docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME run --rm test-runner $PYTEST_CMD || TEST_EXIT_CODE=$?
 
 # Check test results
-if [ $? -eq 0 ]; then
+if [ $TEST_EXIT_CODE -eq 0 ]; then
     log_info "All integration tests passed!"
-    
+
     # Show coverage if enabled
     if [ "$COVERAGE" = true ]; then
         log_info "Coverage report generated in ${COVERAGE_DIR}/html/index.html"
     fi
 else
     log_error "Integration tests failed!"
-    
+
     # Show logs from failed services
     log_error "Showing logs from services..."
     docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME logs --tail=50
-    
+
     exit 1
 fi
 

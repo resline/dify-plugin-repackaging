@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '../../test/utils/test-utils'
 import userEvent from '@testing-library/user-event'
-import TaskStatus from '../TaskStatus.jsx'
+import TaskStatus from '../TaskStatus'
 import { mockWebSocketMessage } from '../../test/utils/test-utils'
 import { server } from '../../test/mocks/server'
 import { http, HttpResponse } from 'msw'

@@ -1,4 +1,57 @@
+# IDE
 .DS_Store
 .idea
 .vscode
 *.iml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+.pytest_cache/
+htmlcov/
+coverage.xml
+*.cover
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Build artifacts
+repackaged_plugins/
+marketplace_har/
+wheels/
+tmp_analysis/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Plugin artifacts (keep source .difypkg for testing)
+langgenius-*/
+
+# Docker
+docker-compose.override.yml
+
+# Test results
+playwright-report/
+playwright-results/
+test-results/
