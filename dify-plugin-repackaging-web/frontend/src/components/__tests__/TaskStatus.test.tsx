@@ -105,7 +105,6 @@ describe('TaskStatus', () => {
     
     // Simulate task progress
     if (ws && ws.onmessage) {
-      if (ws && ws.onmessage) {
       act(() => {
         mockWebSocketMessage(ws, {
           status: 'downloading',
@@ -203,9 +202,10 @@ describe('TaskStatus', () => {
     
     if (ws && ws.onmessage) {
       act(() => {
-      mockWebSocketMessage(ws, completedData)
-    })
-    
+        mockWebSocketMessage(ws, completedData)
+      })
+    }
+
     await waitFor(() => {
       expect(mockOnComplete).toHaveBeenCalledWith(completedData)
     })
@@ -317,7 +317,6 @@ describe('TaskStatus', () => {
     
     // Simulate connection close
     if (ws) {
-      if (ws && ws.onmessage) {
       act(() => {
         ws.close(1006, 'Connection lost')
       })
@@ -470,14 +469,15 @@ describe('TaskStatus', () => {
       const ws = (MockWebSocket as any).lastInstance
       
       if (ws && ws.onmessage) {
-      act(() => {
-        mockWebSocketMessage(ws, {
-          status: 'processing',
-          message: 'Important status update',
-          type: 'status'
+        act(() => {
+          mockWebSocketMessage(ws, {
+            status: 'processing',
+            message: 'Important status update',
+            type: 'status'
+          })
         })
-      })
-      
+      }
+
       // Status messages should be visible
       await waitFor(() => {
         expect(screen.getByText(/important status update/i)).toBeInTheDocument()
@@ -509,16 +509,17 @@ describe('TaskStatus', () => {
       
       // Add more logs
       if (ws && ws.onmessage) {
-      act(() => {
-        for (let i = 1; i < 5; i++) {
-          mockWebSocketMessage(ws, {
-            status: 'processing',
-            message: `Log message ${i}`,
-            type: 'status'
-          })
-        }
-      })
-      
+        act(() => {
+          for (let i = 1; i < 5; i++) {
+            mockWebSocketMessage(ws, {
+              status: 'processing',
+              message: `Log message ${i}`,
+              type: 'status'
+            })
+          }
+        })
+      }
+
       await waitFor(() => {
         expect(screen.getByText(/log message 4/i)).toBeInTheDocument()
       })
