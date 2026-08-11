@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from './components/Layout';
 import UploadForm from './components/UploadForm';
 import TaskStatus from './components/TaskStatus';
@@ -19,6 +19,7 @@ function AppContent() {
   const { isAuthenticated } = useAuth();
   const { toasts, success, error, removeToast } = useToast();
   const deepLinkData = useDeepLink();
+  const processedDeepLinksRef = useRef(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [initialUrl, setInitialUrl] = useState('');
 
@@ -103,7 +104,11 @@ function AppContent() {
     const timeoutId = setTimeout(() => {
       if (!isMounted) return;
       
-      if (deepLinkData && !currentTask) {
+      const deepLinkKey = deepLinkData && JSON.stringify(deepLinkData);
+      if (deepLinkData && !currentTask && !processedDeepLinksRef.current.has(deepLinkKey)) {
+        // A deep link represents one requested task.  Without marking it as consumed,
+        // closing the result panel would submit the same task again on the next render.
+        processedDeepLinksRef.current.add(deepLinkKey);
         if (deepLinkData.type === 'url') {
           setCurrentTab('url');
           setInitialUrl(deepLinkData.url);
@@ -187,9 +192,10 @@ function AppContent() {
     error(errorMsg || 'Task failed. Please try again.');
   };
 
-  const handleNewTask = () => {
+  const handleNewTask = useCallback(() => {
     setCurrentTask(null);
-  };
+    useAppStore.getState().setProcessingPanelMinimized(false);
+  }, [setCurrentTask]);
 
   const handleTabChange = (tabId) => {
     setCurrentTab(tabId);
@@ -285,11 +291,11 @@ function AppContent() {
           {/* Processing panel - shown as overlay when task is active */}
           {currentTask && (
             <ProcessingPanel
-              taskId={currentTask.task_id}
-              onComplete={handleTaskComplete}
-              onError={handleTaskError}
-              onNewTask={handleNewTask}
-            />
+            taskId={currentTask.task_id}
+            onComplete={handleTaskComplete}
+            onError={handleTaskError}
+            onClose={handleNewTask}
+          />
           )}
         </div>
       </Layout>
