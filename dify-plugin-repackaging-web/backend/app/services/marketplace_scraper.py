@@ -273,7 +273,12 @@ class MarketplaceScraper:
                     # Get first option as latest version
                     first_option = version_elem.select_one('option')
                     if first_option:
-                        details['latest_version'] = first_option.get_text(strip=True)
+                        # Option labels carry decoration like "v0.0.9 (latest)",
+                        # so normalise the same way as the text branch below.
+                        opt_text = first_option.get_text(strip=True)
+                        ver_match = re.search(r'(\d+\.\d+\.\d+)', opt_text)
+                        if ver_match:
+                            details['latest_version'] = ver_match.group(1)
                 else:
                     ver_text = version_elem.get_text(strip=True)
                     ver_match = re.search(r'(\d+\.\d+\.\d+)', ver_text)
