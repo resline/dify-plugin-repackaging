@@ -40,6 +40,7 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '', refresh
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isExpanded, setIsExpanded] = useState(true);
+  const [downloadingTaskId, setDownloadingTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -103,6 +104,23 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '', refresh
 
   const getPluginInfo = (task: CompletedTask) => {
     return task.plugin_metadata || task.marketplace_metadata || task.plugin_info;
+  };
+
+  const downloadTask = async (task: CompletedTask) => {
+    if (downloadingTaskId) return;
+
+    try {
+      setDownloadingTaskId(task.task_id);
+      setError('');
+      await taskService.downloadTaskFile(task.task_id, task.output_filename);
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error downloading completed task:', err);
+      }
+      setError('Failed to download completed file');
+    } finally {
+      setDownloadingTaskId(null);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -183,14 +201,15 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '', refresh
                         {formatDate(task.completed_at)}
                       </p>
                     </div>
-                    <a
-                      href={task.download_url}
-                      download
+                    <button
+                      type="button"
+                      onClick={() => downloadTask(task)}
+                      disabled={downloadingTaskId !== null}
                       className="p-1.5 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded transition-all"
                       title="Download"
                     >
                       <Download className="h-4 w-4" />
-                    </a>
+                    </button>
                   </div>
                 </div>
               );
@@ -275,14 +294,15 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '', refresh
                         </p>
                       </div>
                     </div>
-                    <a
-                      href={task.download_url}
-                      download
+                    <button
+                      type="button"
+                      onClick={() => downloadTask(task)}
+                      disabled={downloadingTaskId !== null}
                       className="ml-3 p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all opacity-70 group-hover:opacity-100"
                       title="Download"
                     >
                       <Download className="h-5 w-5" />
-                    </a>
+                    </button>
                   </div>
                 );
               })}

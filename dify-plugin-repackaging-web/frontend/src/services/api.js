@@ -3,6 +3,32 @@ import { withErrorHandling, toApiError, logError } from './utils/errorHandler';
 
 const API_BASE_URL = '/api/v1';
 
+const getDownloadFilename = (contentDisposition, fallbackFilename) => {
+  const encodedMatch = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i);
+  const plainMatch = contentDisposition?.match(/filename="?([^";]+)"?/i);
+  const headerFilename = encodedMatch?.[1]
+    ? decodeURIComponent(encodedMatch[1])
+    : plainMatch?.[1];
+  const filename = headerFilename || fallbackFilename || 'plugin-offline.difypkg';
+
+  // The download attribute must never contain path components supplied by a server.
+  return filename.split(/[\\/]/).pop() || 'plugin-offline.difypkg';
+};
+
+const saveBlob = (blob, filename) => {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  // Give the browser time to start consuming the object URL before releasing it.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+};
+
 // Create axios instance with built-in retry logic
 const api = createAxiosWithRetry(
   {
@@ -123,6 +149,22 @@ export const taskService = {
 
   downloadFile: (taskId) => {
     return `${API_BASE_URL}/tasks/${taskId}/download`;
+  },
+
+  downloadTaskFile: async (taskId, fallbackFilename) => {
+    const response = await api.get(`/tasks/${taskId}/download`, {
+      responseType: 'blob',
+    });
+    const filename = getDownloadFilename(
+      response.headers['content-disposition'],
+      fallbackFilename
+    );
+    const blob = response.data instanceof Blob
+      ? response.data
+      : new Blob([response.data], { type: 'application/octet-stream' });
+
+    saveBlob(blob, filename);
+    return filename;
   },
 
   listRecentTasks: withErrorHandling(

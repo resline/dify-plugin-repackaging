@@ -63,6 +63,7 @@ export class ReconnectingWebSocket {
       console.log(`WebSocket connected for task ${this.taskId}`);
       this.reconnectAttempts = 0;
       this.isReconnecting = false;
+      this.lastPongTime = Date.now();
       this.startHeartbeat();
       
       if (this.options.onOpen) {
@@ -189,12 +190,18 @@ export class ReconnectingWebSocket {
     console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms...`);
     
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.isReconnecting = false;
       this.connect();
     }, delay);
   }
 
   public reconnect(): void {
-    this.close(false);
+    // A user-triggered reconnect must not let the old socket's close event schedule
+    // a second concurrent reconnect.
+    this.close(true);
+    this.isManualClose = false;
+    this.reconnectAttempts = 0;
     this.connect();
   }
 
@@ -226,8 +233,17 @@ export class ReconnectingWebSocket {
     this.stopHeartbeat();
     
     if (this.ws) {
-      this.ws.close();
+      const socket = this.ws;
       this.ws = null;
+
+      if (manual) {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+      }
+
+      socket.close();
     }
   }
 

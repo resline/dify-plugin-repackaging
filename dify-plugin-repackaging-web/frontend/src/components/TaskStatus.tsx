@@ -19,12 +19,25 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
   const [task, setTask] = useState<any>(null);
   const [wsStatus, setWsStatus] = useState<WebSocketConnectionState>('connecting');
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
+  const taskRef = useRef<any>(null);
+  const wsStatusRef = useRef<WebSocketConnectionState>('connecting');
+  const hasLoggedConnectionErrorRef = useRef(false);
   const [logs, setLogs] = useState<any[]>([]);
   const logIdCounter = useRef(0);
   const [logHeight, setLogHeight] = useState(350);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const { success, error: showError } = useToast();
   const hasShownCompletionRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  const onErrorRef = useRef(onError);
+  const successRef = useRef(success);
+  const showErrorRef = useRef(showError);
+
+  onCompleteRef.current = onComplete;
+  onErrorRef.current = onError;
+  successRef.current = success;
+  showErrorRef.current = showError;
 
   // Handle responsive log height
   useEffect(() => {
@@ -40,17 +53,28 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
   useEffect(() => {
     if (!taskId) return;
 
+    taskRef.current = null;
+    wsStatusRef.current = 'connecting';
+    hasLoggedConnectionErrorRef.current = false;
+    hasShownCompletionRef.current = false;
+    setTask(null);
+    setLogs([]);
+    setWsStatus('connecting');
+
     // Initial fetch
-    fetchTaskStatus();
+    fetchTaskStatus(true);
 
     // Setup WebSocket with auto-reconnect
     const ws = createReconnectingWebSocket(taskId, {
       onOpen: () => {
+        wsStatusRef.current = 'connected';
         setWsStatus('connected');
+        hasLoggedConnectionErrorRef.current = false;
         addLogEntry('info', 'Connected to task status updates');
       },
       onMessage: (data) => {
         if (data.type !== 'heartbeat' && data.type !== 'ping' && data.type !== 'pong') {
+          taskRef.current = data;
           setTask(data);
           
           // Add log entry for status changes and messages
@@ -65,25 +89,30 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
           if (data.status === 'completed' && !hasShownCompletionRef.current) {
             hasShownCompletionRef.current = true;
             setShowConfetti(true);
-            success('Plugin repackaged successfully! 🎉');
+            successRef.current('Plugin repackaged successfully! 🎉');
             setTimeout(() => setShowConfetti(false), 5000);
-            onComplete(data);
+            onCompleteRef.current(data);
           } else if (data.status === 'failed') {
-            showError(data.error || 'Task failed');
-            onError(data.error || 'Task failed');
+            showErrorRef.current(data.error || 'Task failed');
+            onErrorRef.current(data.error || 'Task failed');
           }
         }
       },
       onError: () => {
+        wsStatusRef.current = 'error';
         setWsStatus('error');
-        // Only log error if not already in error state to avoid spam
-        if (wsStatus !== 'error') {
+        // Log once per outage. Reconnect attempts can emit both error and close events.
+        if (!hasLoggedConnectionErrorRef.current) {
+          hasLoggedConnectionErrorRef.current = true;
           addLogEntry('error', 'WebSocket connection error', 'Attempting to reconnect...');
         }
       },
       onClose: () => {
+        const previousStatus = wsStatusRef.current;
+        wsStatusRef.current = 'disconnected';
         setWsStatus('disconnected');
-        if (task?.status !== 'completed' && task?.status !== 'failed' && wsStatus === 'connected') {
+        const currentTask = taskRef.current;
+        if (currentTask?.status !== 'completed' && currentTask?.status !== 'failed' && previousStatus === 'connected') {
           addLogEntry('warning', 'Connection lost', 'Attempting to reconnect automatically...');
         }
       },
@@ -95,12 +124,14 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
     wsRef.current = ws;
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
+      ws.close();
+      if (wsRef.current === ws) {
         wsRef.current = null;
       }
     };
-  }, [taskId, onComplete, onError, success, showError]);
+    // The connection lifecycle belongs to the task id. Callback identities from the
+    // parent and useToast change during ordinary renders and must not recreate it.
+  }, [taskId]);
 
   const addLogEntry = (level: string, message: string, details?: string) => {
     setLogs(prev => [...prev, {
@@ -129,7 +160,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
     }
   };
 
-  const fetchTaskStatus = async () => {
+  const fetchTaskStatus = async (forceInitialLog = false) => {
     try {
       const data = await taskService.getTaskStatus(taskId);
       
@@ -140,10 +171,11 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
         return;
       }
       
+      taskRef.current = data;
       setTask(data);
       
       // Add initial log entry if this is the first fetch
-      if (logs.length === 0) {
+      if (forceInitialLog || logs.length === 0) {
         addLogEntry('info', `Task ${taskId} started`, `Status: ${data.status}`);
         if (data.message) {
           const logLevel = data.status === 'failed' ? 'error' : 
@@ -156,17 +188,31 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
       if (data.status === 'completed' && !hasShownCompletionRef.current) {
         hasShownCompletionRef.current = true;
         setShowConfetti(true);
-        success('Plugin repackaged successfully! 🎉');
+        successRef.current('Plugin repackaged successfully! 🎉');
         setTimeout(() => setShowConfetti(false), 5000);
-        onComplete(data);
+        onCompleteRef.current(data);
       } else if (data.status === 'failed') {
-        showError(data.error || 'Task failed');
-        onError(data.error || 'Task failed');
+        showErrorRef.current(data.error || 'Task failed');
+        onErrorRef.current(data.error || 'Task failed');
       }
     } catch (error: any) {
       console.error('Error fetching task status:', error);
       addLogEntry('error', 'Failed to fetch task status', error.message || 'Network error');
       // Don't throw - gracefully handle the error
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!task || isDownloading) return;
+
+    try {
+      setIsDownloading(true);
+      await taskService.downloadTaskFile(taskId, task.output_filename);
+    } catch (error: any) {
+      console.error('Error downloading task result:', error);
+      showErrorRef.current(error?.message || 'Failed to download plugin');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -234,7 +280,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
             />
             {(wsStatus === 'disconnected' || wsStatus === 'error') && task.status !== 'completed' && task.status !== 'failed' && (
               <button
-                onClick={fetchTaskStatus}
+                onClick={() => fetchTaskStatus()}
                 className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                 title="Refresh status"
               >
@@ -280,14 +326,15 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
                 </p>
               </div>
               {task.download_url && (
-                <a
-                  href={task.download_url}
-                  download
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
                   className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   <Download className="mr-2 h-5 w-5" />
-                  Download Plugin
-                </a>
+                  {isDownloading ? 'Downloading...' : 'Download Plugin'}
+                </button>
               )}
             </div>
           </div>
@@ -311,14 +358,15 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
       <div className="flex flex-wrap gap-3">
         {/* Download button (secondary location) */}
         {task.status === 'completed' && task.download_url && (
-          <a
-            href={task.download_url}
-            download
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isDownloading}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all shadow-sm hover:shadow-md"
           >
             <Download className="mr-2 h-4 w-4" />
-            Download {task.output_filename || 'Repackaged Plugin'}
-          </a>
+            {isDownloading ? 'Downloading...' : `Download ${task.output_filename || 'Repackaged Plugin'}`}
+          </button>
         )}
         
         {/* New Task button */}
