@@ -16,13 +16,26 @@ class DownloadService:
     def validate_url(url: str) -> bool:
         """Validate if URL is from allowed domains"""
         parsed = urlparse(url)
-        domain = parsed.netloc.lower()
-        
+
+        # Only plain HTTP(S) downloads are supported
+        if parsed.scheme not in ("http", "https"):
+            return False
+
+        # hostname strips userinfo and port, unlike netloc
+        domain = (parsed.hostname or "").lower()
+        if not domain:
+            return False
+
         # Remove www. prefix if present
         if domain.startswith("www."):
             domain = domain[4:]
-        
-        return any(domain.endswith(allowed) for allowed in settings.ALLOWED_DOWNLOAD_DOMAINS)
+
+        # Exact match or a real subdomain. A bare suffix check would let
+        # evilgithub.com pass as github.com.
+        return any(
+            domain == allowed or domain.endswith("." + allowed)
+            for allowed in settings.ALLOWED_DOWNLOAD_DOMAINS
+        )
     
     @staticmethod
     async def check_file_size(url: str) -> Optional[int]:

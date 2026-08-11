@@ -197,7 +197,7 @@ class FileManager:
 
                 if os.path.isdir(dir_path):
                     # Check directory modification time
-                    mtime = datetime.fromtimestamp(os.path.getmtime(dir_path))
+                    mtime = datetime.fromtimestamp(os.path.getmtime(dir_path), tz=timezone.utc)
                     
                     if mtime < cutoff_time:
                         # Check if this is a completed task
