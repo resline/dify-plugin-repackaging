@@ -10,7 +10,7 @@ from datetime import datetime
 from fastapi import HTTPException
 
 from app.api.v1.endpoints.tasks import TaskCreateWithMarketplace
-from app.models.task import TaskStatus, MarketplaceTaskCreate, PlatformEnum
+from app.models.task import TaskStatus, MarketplaceTaskCreate, Platform
 
 
 class TestTaskModels:
@@ -20,12 +20,12 @@ class TestTaskModels:
         """Test creating task with valid URL."""
         task = TaskCreateWithMarketplace(
             url="https://example.com/plugin.difypkg",
-            platform="linux",
+            platform="manylinux2014_x86_64",
             suffix="custom"
         )
         assert task.url == "https://example.com/plugin.difypkg"
         assert task.marketplace_plugin is None
-        assert task.platform == "linux"
+        assert task.platform == "manylinux2014_x86_64"
         assert task.suffix == "custom"
 
     def test_task_create_with_marketplace_valid_plugin(self):
@@ -58,13 +58,13 @@ class TestTaskModels:
             author="langgenius",
             name="agent",
             version="0.0.9",
-            platform=PlatformEnum.MANYLINUX2014_X86_64,
+            platform=Platform.MANYLINUX2014_X86_64,
             suffix="custom"
         )
         assert task.author == "langgenius"
         assert task.name == "agent"
         assert task.version == "0.0.9"
-        assert task.platform == PlatformEnum.MANYLINUX2014_X86_64
+        assert task.platform == Platform.MANYLINUX2014_X86_64
         assert task.suffix == "custom"
 
     def test_marketplace_task_create_defaults(self):
@@ -74,24 +74,26 @@ class TestTaskModels:
             name="plugin",
             version="1.0.0"
         )
-        assert task.platform == PlatformEnum.AUTO
+        assert task.platform == Platform.DEFAULT
         assert task.suffix == "offline"
 
     def test_task_status_enum(self):
         """Test TaskStatus enum values."""
         assert TaskStatus.PENDING.value == "pending"
+        assert TaskStatus.DOWNLOADING.value == "downloading"
         assert TaskStatus.PROCESSING.value == "processing"
         assert TaskStatus.COMPLETED.value == "completed"
         assert TaskStatus.FAILED.value == "failed"
-        assert TaskStatus.CANCELLED.value == "cancelled"
 
     def test_platform_enum(self):
-        """Test PlatformEnum values."""
-        assert PlatformEnum.AUTO.value == ""
-        assert PlatformEnum.MANYLINUX2014_X86_64.value == "manylinux2014_x86_64"
-        assert PlatformEnum.MANYLINUX2014_AARCH64.value == "manylinux2014_aarch64"
-        assert PlatformEnum.MANYLINUX2010_X86_64.value == "manylinux2010_x86_64"
-        assert PlatformEnum.MANYLINUX2010_I686.value == "manylinux2010_i686"
+        """Test Platform enum values."""
+        assert Platform.DEFAULT.value == ""
+        assert Platform.MANYLINUX2014_X86_64.value == "manylinux2014_x86_64"
+        assert Platform.MANYLINUX2014_AARCH64.value == "manylinux2014_aarch64"
+        assert Platform.MANYLINUX_2_17_X86_64.value == "manylinux_2_17_x86_64"
+        assert Platform.MANYLINUX_2_17_AARCH64.value == "manylinux_2_17_aarch64"
+        assert Platform.MACOSX_10_9_X86_64.value == "macosx_10_9_x86_64"
+        assert Platform.MACOSX_11_0_ARM64.value == "macosx_11_0_arm64"
 
 
 class TestTaskEndpointHelpers:
