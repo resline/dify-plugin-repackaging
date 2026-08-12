@@ -221,11 +221,13 @@ class TestSearchPlugins:
         mock_redis.get.return_value = None  # No cache
         
         api_response = {
-            "data": [
+            "data": {
+                "plugins": [
                 {"name": "plugin1", "author": "test"},
                 {"name": "plugin2", "author": "test"}
-            ],
-            "total": 2
+                ],
+                "total": 2,
+            },
         }
         
         with patch('app.services.marketplace.redis_client', mock_redis):
@@ -240,11 +242,11 @@ class TestSearchPlugins:
                 
                 mock_get_client.return_value.__aenter__.return_value = mock_client
                 
-                with patch('app.services.marketplace.marketplace_circuit_breaker.async_call') as mock_breaker:
-                    async def call_func(func):
-                        return await func()
-                    mock_breaker.side_effect = call_func
-                    
+                with patch.object(
+                    MarketplaceService,
+                    '_make_api_request',
+                    new=AsyncMock(return_value=mock_response),
+                ):
                     result = await MarketplaceService.search_plugins(
                         query="test",
                         page=1,
@@ -277,20 +279,15 @@ class TestSearchPlugins:
                 mock_response2.json.return_value = {"data": [], "total": 0}
                 mock_response2.raise_for_status = Mock()
                 
-                mock_client.get.side_effect = [mock_response1, mock_response2]
                 mock_get_client.return_value.__aenter__.return_value = mock_client
                 
-                with patch('app.services.marketplace.marketplace_circuit_breaker.async_call') as mock_breaker:
-                    call_count = 0
-                    async def call_func(func):
-                        nonlocal call_count
-                        call_count += 1
-                        if call_count == 1:
-                            # First call fails
-                            raise httpx.HTTPError("Server error")
-                        return await func()
-                    mock_breaker.side_effect = call_func
-                    
+                with patch.object(
+                    MarketplaceService,
+                    '_make_api_request',
+                    new=AsyncMock(
+                        side_effect=[httpx.HTTPError("Server error"), mock_response2]
+                    ),
+                ):
                     result = await MarketplaceService.search_plugins()
                     
                     assert result["plugins"] == []

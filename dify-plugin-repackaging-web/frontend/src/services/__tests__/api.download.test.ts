@@ -1,14 +1,13 @@
-import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { server } from '../../test/mocks/server';
-import { taskService } from '../api';
+import type { AxiosAdapter } from 'axios';
+import api, { taskService } from '../api';
 
 describe('authenticated task download', () => {
   const taskId = 'test-task-123';
   const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  const originalAdapter = api.defaults.adapter;
 
   beforeEach(() => {
-    localStorage.setItem('auth_token', 'test-secret');
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
       value: vi.fn(() => 'blob:test-download'),
@@ -20,28 +19,35 @@ describe('authenticated task download', () => {
   });
 
   afterEach(() => {
+    api.defaults.adapter = originalAdapter;
     localStorage.clear();
     click.mockClear();
   });
 
   it('sends the auth token and saves the response as a .difypkg file', async () => {
-    let receivedToken: string | null = null;
-
-    server.use(
-      http.get(`/api/v1/tasks/${taskId}/download`, ({ request }) => {
-        receivedToken = request.headers.get('x-auth-token');
-        return new HttpResponse(new Blob(['plugin bytes']), {
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            'Content-Disposition': 'attachment; filename="example-offline.difypkg"',
-          },
-        });
-      })
-    );
+    let sentWithCredentials = false;
+    let sentLegacyToken = false;
+    const adapter: AxiosAdapter = vi.fn(async (config) => {
+      sentWithCredentials = config.withCredentials === true;
+      sentLegacyToken = config.headers.has('X-Auth-Token');
+      return {
+        data: new Blob(['plugin bytes']),
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          'content-type': 'application/octet-stream',
+          'content-disposition': 'attachment; filename="example-offline.difypkg"',
+        },
+        config,
+      };
+    });
+    api.defaults.adapter = adapter;
 
     const filename = await taskService.downloadTaskFile(taskId, 'fallback.difypkg');
 
-    expect(receivedToken).toBe('test-secret');
+    expect(sentWithCredentials).toBe(true);
+    expect(sentLegacyToken).toBe(false);
+    expect(adapter).toHaveBeenCalledOnce();
     expect(filename).toBe('example-offline.difypkg');
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);

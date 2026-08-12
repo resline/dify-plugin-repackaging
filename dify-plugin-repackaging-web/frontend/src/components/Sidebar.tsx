@@ -11,7 +11,7 @@ const Sidebar: React.FC = () => {
       {/* Sidebar toggle button - always visible */}
       <button
         onClick={toggleSidebar}
-        className={`fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 ${
+        className={`fixed right-0 top-1/2 -translate-y-1/2 z-[56] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-1'
         }`}
         style={{ right: isSidebarOpen ? '320px' : '0' }}
@@ -26,7 +26,8 @@ const Sidebar: React.FC = () => {
 
       {/* Sidebar */}
       <div
-        className={`fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl z-20 transition-transform duration-300 ease-in-out ${
+        data-testid="completed-files-sidebar"
+        className={`fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl z-[55] transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -53,7 +54,8 @@ const Sidebar: React.FC = () => {
       {/* Mobile overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-10 lg:hidden"
+          data-testid="sidebar-mobile-overlay"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[54] lg:hidden"
           onClick={toggleSidebar}
           aria-hidden="true"
         />

@@ -42,18 +42,17 @@ describe('FileUpload', () => {
   })
 
   it('validates file extension', async () => {
-    const user = userEvent.setup()
     render(<FileUpload {...defaultProps} />)
     
     const invalidFile = createMockFile('plugin.zip', 1024000, 'application/zip')
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     
-    await user.upload(input, invalidFile)
+    fireEvent.change(input, { target: { files: [invalidFile] } })
     
     await waitFor(() => {
       expect(screen.getByText('File must have .difypkg extension')).toBeInTheDocument()
     })
-    expect(mockOnFileSelect).not.toHaveBeenCalled()
+    expect(mockOnFileSelect).toHaveBeenCalledWith(null)
   })
 
   it('validates file size', async () => {
@@ -69,7 +68,7 @@ describe('FileUpload', () => {
     await waitFor(() => {
       expect(screen.getByText('File size must be less than 100MB')).toBeInTheDocument()
     })
-    expect(mockOnFileSelect).not.toHaveBeenCalled()
+    expect(mockOnFileSelect).toHaveBeenCalledWith(null)
   })
 
   it('handles drag and drop', async () => {
@@ -82,11 +81,12 @@ describe('FileUpload', () => {
     fireEvent.dragEnter(dropZone, {
       dataTransfer: {
         files: [file],
+        items: [file],
         types: ['Files']
       }
     })
     
-    expect(dropZone).toHaveClass('border-indigo-600')
+    expect(dropZone).toHaveClass('border-blue-500')
     
     // Simulate drop
     fireEvent.drop(dropZone, {
@@ -129,7 +129,7 @@ describe('FileUpload', () => {
     await user.upload(input, file)
     
     expect(await screen.findByText('my-plugin.difypkg')).toBeInTheDocument()
-    expect(screen.getByText('2.00 MB')).toBeInTheDocument()
+    expect(screen.getByText('1.95 MB')).toBeInTheDocument()
   })
 
   it('allows file removal', async () => {
@@ -159,14 +159,13 @@ describe('FileUpload', () => {
   })
 
   it('clears error when new file is selected', async () => {
-    const user = userEvent.setup()
     render(<FileUpload {...defaultProps} />)
     
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     
     // Upload invalid file
     const invalidFile = createMockFile('plugin.zip', 1024000, 'application/zip')
-    await user.upload(input, invalidFile)
+    fireEvent.change(input, { target: { files: [invalidFile] } })
     
     await waitFor(() => {
       expect(screen.getByText('File must have .difypkg extension')).toBeInTheDocument()
@@ -174,7 +173,7 @@ describe('FileUpload', () => {
     
     // Upload valid file
     const validFile = createMockFile('plugin.difypkg', 1024000, 'application/octet-stream')
-    await user.upload(input, validFile)
+    fireEvent.change(input, { target: { files: [validFile] } })
     
     expect(screen.queryByText('File must have .difypkg extension')).not.toBeInTheDocument()
   })

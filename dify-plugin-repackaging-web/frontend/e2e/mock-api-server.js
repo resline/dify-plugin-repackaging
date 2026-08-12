@@ -1,6 +1,8 @@
 const http = require('http');
 
 const server = http.createServer((req, res) => {
+  const requestUrl = new URL(req.url, 'http://localhost:8000');
+
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -13,19 +15,25 @@ const server = http.createServer((req, res) => {
   }
 
   // Mock responses
-  if (req.url === '/api/v1/health') {
+  if (requestUrl.pathname === '/api/v1/health') {
     res.writeHead(200);
     res.end(JSON.stringify({ status: 'healthy' }));
-  } else if (req.url === '/api/v1/tasks?limit=10' || req.url === '/api/v1/tasks') {
+  } else if (requestUrl.pathname === '/api/v1/auth/session') {
     res.writeHead(200);
-    res.end(JSON.stringify({ tasks: [] }));
-  } else if (req.url === '/api/v1/tasks/completed') {
+    res.end(JSON.stringify({ authenticated: true }));
+  } else if (requestUrl.pathname === '/api/v1/auth/login' || requestUrl.pathname === '/api/v1/auth/logout') {
     res.writeHead(200);
-    res.end(JSON.stringify({ tasks: [] }));
-  } else if (req.url === '/api/v1/files') {
+    res.end(JSON.stringify({ authenticated: requestUrl.pathname.endsWith('/login') }));
+  } else if (requestUrl.pathname === '/api/v1/tasks') {
     res.writeHead(200);
-    res.end(JSON.stringify({ files: [] }));
-  } else if (req.url.startsWith('/api/v1/marketplace/plugins')) {
+    res.end(JSON.stringify({ tasks: [], total: 0 }));
+  } else if (requestUrl.pathname === '/api/v1/tasks/completed') {
+    res.writeHead(200);
+    res.end(JSON.stringify({ tasks: [], total: 0 }));
+  } else if (requestUrl.pathname === '/api/v1/files') {
+    res.writeHead(200);
+    res.end(JSON.stringify({ files: [], total: 0 }));
+  } else if (requestUrl.pathname === '/api/v1/marketplace/plugins') {
     res.writeHead(200);
     res.end(JSON.stringify({ plugins: [], total: 0 }));
   } else {

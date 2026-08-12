@@ -3,7 +3,7 @@
 
 default_language_version:
   python: python3.12
-  node: "20"
+  node: "24"
 
 repos:
   # General hooks

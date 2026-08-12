@@ -1,5 +1,5 @@
 import api from './api';
-import type { FileInfo, FileListResponse } from '../types/file';
+import type { DeleteFileResponse, FileListResponse } from '../types/file';
 import { withErrorHandling } from './utils/errorHandler';
 
 const API_BASE_URL = '/api/v1';
@@ -20,7 +20,7 @@ export const fileService = {
     {
       context: 'listFiles',
       defaultValue: { files: [], total: 0, limit: 20, offset: 0 },
-      rethrow: false
+      rethrow: true
     }
   ),
 
@@ -37,8 +37,9 @@ export const fileService = {
    * @param fileId - ID of the file to delete
    */
   deleteFile: withErrorHandling(
-    async (fileId: string): Promise<void> => {
-      await api.delete(`/files/${fileId}`);
+    async (fileId: string): Promise<DeleteFileResponse> => {
+      const response = await api.delete<DeleteFileResponse>(`/files/${fileId}`);
+      return response.data;
     },
     {
       context: 'deleteFile',

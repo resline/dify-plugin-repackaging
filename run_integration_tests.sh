@@ -72,9 +72,9 @@ log_warning() {
 cleanup() {
     if [ "$KEEP_RUNNING" = false ]; then
         log_info "Cleaning up test environment..."
-        docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME down -v
+        docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" down -v
     else
-        log_info "Keeping test environment running (use 'docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME down -v' to stop)"
+        log_info "Keeping test environment running (use 'docker compose -f $COMPOSE_FILE -p $PROJECT_NAME down -v' to stop)"
     fi
 }
 
@@ -87,7 +87,7 @@ mkdir -p $COVERAGE_DIR
 
 # Start test environment
 log_info "Starting test environment..."
-docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME up -d
+docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" up -d
 
 # Wait for services to be ready
 log_info "Waiting for services to be ready..."
@@ -95,7 +95,7 @@ sleep 10
 
 # Check service health
 log_info "Checking service health..."
-docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME ps
+docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" ps
 
 # Run tests
 log_info "Running integration tests..."
@@ -124,7 +124,8 @@ fi
 # Execute tests in test runner container
 log_info "Executing: $PYTEST_CMD"
 TEST_EXIT_CODE=0
-docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME run --rm test-runner $PYTEST_CMD || TEST_EXIT_CODE=$?
+read -r -a PYTEST_ARGS <<< "$PYTEST_CMD"
+docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" run --rm test-runner "${PYTEST_ARGS[@]}" || TEST_EXIT_CODE=$?
 
 # Check test results
 if [ $TEST_EXIT_CODE -eq 0 ]; then
@@ -139,7 +140,7 @@ else
 
     # Show logs from failed services
     log_error "Showing logs from services..."
-    docker-compose -f $COMPOSE_FILE -p $PROJECT_NAME logs --tail=50
+    docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" logs --tail=50
 
     exit 1
 fi

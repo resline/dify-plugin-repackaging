@@ -6,6 +6,9 @@
 
 # Python
 __pycache__/
+.venv/
+venv/
+test_venv/
 *.py[cod]
 *$py.class
 *.so

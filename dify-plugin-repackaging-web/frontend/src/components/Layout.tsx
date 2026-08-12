@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Package, Link, Store, File, ChevronLeft, Plus, Command, Moon, Sun, LogOut } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import type { TabId } from '../types/app';
 
 interface Tab {
-  id: string;
+  id: TabId;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   shortcut: string;
@@ -12,11 +13,10 @@ interface Tab {
 
 interface LayoutProps {
   children: React.ReactNode;
-  currentTab: string;
-  onTabChange: (tabId: string) => void;
+  currentTab: TabId;
+  onTabChange: (tabId: TabId) => void;
   isProcessing: boolean;
   onNewTask: () => void;
-  showBackButton?: boolean;
 }
 
 const Layout: React.FC<LayoutProps> = ({
@@ -25,7 +25,6 @@ const Layout: React.FC<LayoutProps> = ({
   onTabChange,
   isProcessing,
   onNewTask,
-  showBackButton = false
 }) => {
   const { isDark, toggleTheme } = useTheme();
   const { logout } = useAuth();

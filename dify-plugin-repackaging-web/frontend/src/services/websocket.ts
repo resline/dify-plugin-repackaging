@@ -20,8 +20,8 @@ export class ReconnectingWebSocket {
   private options: WebSocketOptions;
   private reconnectAttempts = 0;
   private isReconnecting = false;
-  private heartbeatTimer: NodeJS.Timer | null = null;
-  private reconnectTimer: NodeJS.Timer | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPongTime: number = Date.now();
   private isManualClose = false;
 
@@ -60,7 +60,9 @@ export class ReconnectingWebSocket {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
-      console.log(`WebSocket connected for task ${this.taskId}`);
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`WebSocket connected for task ${this.taskId}`);
+      }
       this.reconnectAttempts = 0;
       this.isReconnecting = false;
       this.lastPongTime = Date.now();
@@ -113,15 +115,22 @@ export class ReconnectingWebSocket {
     };
 
     this.ws.onclose = (event) => {
-      console.log(`WebSocket closed for task ${this.taskId}. Code: ${event.code}, Reason: ${event.reason}`);
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`WebSocket closed for task ${this.taskId}. Code: ${event.code}, Reason: ${event.reason}`);
+      }
       this.stopHeartbeat();
       
-      // Check for specific close codes
-      if (event.code === 1008 && event.reason === 'Task not found') {
+      // Policy failures cannot recover by reconnecting the same socket.
+      if (event.code === 1008 && event.reason === 'Authentication required') {
+        this.isManualClose = true;
+        window.dispatchEvent(new CustomEvent(
+          'auth:unauthorized',
+          { detail: 'Your session expired. Please sign in again.' },
+        ));
+      } else if (event.code === 1008 && event.reason === 'Task not found') {
         if (process.env.NODE_ENV !== 'test') {
           console.error(`Task ${this.taskId} not found. WebSocket connection rejected.`);
         }
-        // Don't attempt to reconnect for non-existent tasks
         this.isManualClose = true;
       }
       
@@ -144,7 +153,7 @@ export class ReconnectingWebSocket {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         // Check if we've received a response recently
         const timeSinceLastPong = Date.now() - this.lastPongTime;
-        if (timeSinceLastPong > this.options.heartbeatInterval! * 2) {
+        if (timeSinceLastPong >= this.options.heartbeatInterval! * 2) {
           if (process.env.NODE_ENV !== 'test') {
             console.warn(`No pong received for ${timeSinceLastPong}ms, reconnecting...`);
           }
@@ -187,7 +196,9 @@ export class ReconnectingWebSocket {
       30000 // Max 30 seconds
     );
     
-    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms...`);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms...`);
+    }
     
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;

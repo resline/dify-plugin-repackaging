@@ -123,23 +123,23 @@ async def test_connection_manager_cleanup():
     ws = MockWebSocket()
     task_id = "test-cleanup-123"
     
-    await manager.connect(ws, task_id)
+    await manager.connect(task_id, ws)
     assert task_id in manager.active_connections
     assert ws in manager.active_connections[task_id]
     
     # Disconnect
-    await manager.disconnect(ws, task_id)
+    await manager.disconnect(task_id, ws)
     assert task_id not in manager.active_connections
     
     # Test stale connection cleanup
     ws2 = MockWebSocket()
-    await manager.connect(ws2, task_id)
+    await manager.connect(task_id, ws2)
     
     # Close the connection to simulate stale connection
     ws2.closed = True
     
     # Run cleanup
-    await manager._cleanup_disconnected_connections()
+    await manager._cleanup_stale_connections()
     
     # Connection should be removed
     assert task_id not in manager.active_connections or ws2 not in manager.active_connections.get(task_id, [])

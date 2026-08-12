@@ -7,22 +7,31 @@ import WebSocketStatus from './WebSocketStatus';
 import LogViewer from './LogViewer';
 import Confetti from './Confetti';
 import { useToast } from './Toast';
+import type { Task } from '../types/app';
+import type { LogEntry } from '../types/logger';
 
 interface TaskStatusProps {
   taskId: string;
-  onComplete: (task: any) => void;
+  onComplete: (task: Task) => void;
   onError: (error: string) => void;
   onNewTask: () => void;
+  onStatusChange?: (task: Task) => void;
 }
 
-const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, onNewTask }) => {
-  const [task, setTask] = useState<any>(null);
+const TaskStatus: React.FC<TaskStatusProps> = ({
+  taskId,
+  onComplete,
+  onError,
+  onNewTask,
+  onStatusChange
+}) => {
+  const [task, setTask] = useState<Task | null>(null);
   const [wsStatus, setWsStatus] = useState<WebSocketConnectionState>('connecting');
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
-  const taskRef = useRef<any>(null);
+  const taskRef = useRef<Task | null>(null);
   const wsStatusRef = useRef<WebSocketConnectionState>('connecting');
   const hasLoggedConnectionErrorRef = useRef(false);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const logIdCounter = useRef(0);
   const [logHeight, setLogHeight] = useState(350);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -33,11 +42,19 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
   const onErrorRef = useRef(onError);
   const successRef = useRef(success);
   const showErrorRef = useRef(showError);
+  const onStatusChangeRef = useRef(onStatusChange);
 
   onCompleteRef.current = onComplete;
   onErrorRef.current = onError;
   successRef.current = success;
   showErrorRef.current = showError;
+  onStatusChangeRef.current = onStatusChange;
+
+  const updateTask = (nextTask: Task) => {
+    taskRef.current = nextTask;
+    setTask(nextTask);
+    onStatusChangeRef.current?.(nextTask);
+  };
 
   // Handle responsive log height
   useEffect(() => {
@@ -74,8 +91,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
       },
       onMessage: (data) => {
         if (data.type !== 'heartbeat' && data.type !== 'ping' && data.type !== 'pong') {
-          taskRef.current = data;
-          setTask(data);
+          updateTask(data);
           
           // Add log entry for status changes and messages
           if (data.message || data.status) {
@@ -133,7 +149,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
     // parent and useToast change during ordinary renders and must not recreate it.
   }, [taskId]);
 
-  const addLogEntry = (level: string, message: string, details?: string) => {
+  const addLogEntry = (level: LogEntry['level'], message: string, details?: string) => {
     setLogs(prev => [...prev, {
       id: `log-${logIdCounter.current++}`,
       timestamp: new Date(),
@@ -143,7 +159,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
     }]);
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: Task['status']) => {
     switch (status) {
       case 'pending':
         return 'Waiting to start...';
@@ -171,8 +187,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
         return;
       }
       
-      taskRef.current = data;
-      setTask(data);
+      updateTask(data);
       
       // Add initial log entry if this is the first fetch
       if (forceInitialLog || logs.length === 0) {
@@ -218,11 +233,13 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
 
   if (!task) {
     return (
-      <div className="flex items-center justify-center py-8">
+      <div className="flex items-center justify-center py-8" role="status" aria-label="Loading task status">
         <Loader className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
       </div>
     );
   }
+
+  const pluginInfo = task.plugin_metadata || task.marketplace_metadata || task.plugin_info;
 
   const getStatusIcon = () => {
     switch (task.status) {
@@ -255,7 +272,11 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
       <Confetti active={showConfetti} />
       
       {/* Status card with improved visual feedback */}
-      <div className={`rounded-lg border-2 p-6 transition-all duration-300 ${getStatusColor()}`}>
+      <div
+        className={`rounded-lg border-2 p-6 transition-all duration-300 ${getStatusColor()}`}
+        role="status"
+        aria-live="polite"
+      >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             {getStatusIcon()}
@@ -298,7 +319,14 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
               <span>Progress</span>
               <span className="font-medium">{task.progress}%</span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+            <div
+              className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden"
+              role="progressbar"
+              aria-label="Task progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={task.progress}
+            >
               <div
                 className="bg-blue-600 dark:bg-blue-400 h-3 rounded-full transition-all duration-300 relative overflow-hidden"
                 style={{ width: `${task.progress}%` }}
@@ -381,7 +409,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
       </div>
 
       {/* Plugin metadata */}
-      {(task.plugin_metadata || task.marketplace_metadata || task.plugin_info) && (
+      {pluginInfo && (
         <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
           <div className="flex items-center gap-2 mb-3">
             <Package className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -391,27 +419,27 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
             <div className="flex items-center gap-2">
               <span className="text-gray-500 dark:text-gray-400">Name:</span>
               <span className="font-medium text-gray-900 dark:text-gray-100">
-                {(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).name}
+                {pluginInfo.name}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <User className="h-3 w-3 text-gray-400" />
               <span className="text-gray-500 dark:text-gray-400">Author:</span>
               <span className="font-medium text-gray-900 dark:text-gray-100">
-                {(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).author}
+                {pluginInfo.author}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <Tag className="h-3 w-3 text-gray-400" />
               <span className="text-gray-500 dark:text-gray-400">Version:</span>
               <span className="font-medium text-gray-900 dark:text-gray-100">
-                v{(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).version}
+                v{pluginInfo.version}
               </span>
             </div>
           </div>
-          {(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).description && (
+          {pluginInfo.description && (
             <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-              {(task.plugin_metadata || task.marketplace_metadata || task.plugin_info).description}
+              {pluginInfo.description}
             </p>
           )}
         </div>
@@ -431,61 +459,6 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
         </div>
       </details>
 
-      <style jsx>{`
-        @keyframes bounce-in {
-          0% {
-            transform: scale(0.3);
-            opacity: 0;
-          }
-          50% {
-            transform: scale(1.05);
-          }
-          70% {
-            transform: scale(0.9);
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
-          20%, 40%, 60%, 80% { transform: translateX(2px); }
-        }
-
-        @keyframes progress-shine {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-
-        @keyframes gradient-xy {
-          0%, 100% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-        }
-
-        .animate-bounce-in {
-          animation: bounce-in 0.6s ease-out;
-        }
-
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-
-        .animate-progress-shine {
-          animation: progress-shine 1.5s ease-in-out infinite;
-        }
-
-        .animate-gradient-xy {
-          background-size: 200% 200%;
-          animation: gradient-xy 3s ease infinite;
-        }
-      `}</style>
     </div>
   );
 };

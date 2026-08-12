@@ -1,42 +1,29 @@
-import React, { useState } from 'react';
-import { Upload, Link, Store, File, Info } from 'lucide-react';
-import { Listbox } from '@headlessui/react';
+import React, { useEffect, useState } from 'react';
+import { Upload, Link, Info } from 'lucide-react';
 import MarketplaceBrowser from './MarketplaceBrowser';
 import FileUpload from './FileUpload';
 import PlatformSelector from './PlatformSelector';
+import type {
+  FileUploadSelection,
+  MarketplaceSelection,
+  RepackageFormData,
+} from '../types/app';
 
 interface Platform {
   value: string;
   label: string;
 }
 
-interface FormData {
-  url: string;
-  platform: string;
-  suffix: string;
-}
-
-interface MarketplaceData {
-  author: string;
-  name: string;
-  version: string;
-  platform?: string;
-  suffix?: string;
-}
-
-interface FileData {
-  file: File;
-  platform: string;
-  suffix: string;
-}
-
 interface UploadFormProps {
-  onSubmit: (data: FormData) => void;
-  onSubmitMarketplace: (data: MarketplaceData) => void;
-  onSubmitFile: (data: FileData) => void;
+  onSubmit: (data: RepackageFormData) => void;
+  onSubmitMarketplace: (data: MarketplaceSelection) => void;
+  onSubmitFile: (data: FileUploadSelection) => void;
   isLoading: boolean;
   currentTab: string;
-  onTabChange: (tabId: string) => void;
+  initialUrl?: string;
+  initialPlatform?: string;
+  initialSuffix?: string;
+  onFormStateChange?: (state: Partial<RepackageFormData>) => void;
 }
 
 const platforms: Platform[] = [
@@ -49,12 +36,28 @@ const platforms: Platform[] = [
   { value: 'macosx_11_0_arm64', label: 'macOS ARM64' },
 ];
 
-const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, onSubmitFile, isLoading, currentTab, onTabChange }) => {
-  const [url, setUrl] = useState('');
-  const [platform, setPlatform] = useState(platforms[0]);
-  const [suffix, setSuffix] = useState('offline');
+const UploadForm: React.FC<UploadFormProps> = ({
+  onSubmit,
+  onSubmitMarketplace,
+  onSubmitFile,
+  isLoading,
+  currentTab,
+  initialUrl = '',
+  initialPlatform = '',
+  initialSuffix = 'offline',
+  onFormStateChange,
+}) => {
+  const [url, setUrl] = useState(initialUrl);
+  const [platform, setPlatform] = useState(
+    platforms.find((candidate) => candidate.value === initialPlatform) || platforms[0]
+  );
+  const [suffix, setSuffix] = useState(initialSuffix);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    setUrl(initialUrl);
+  }, [initialUrl]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -93,7 +96,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
     }
   };
 
-  const handleMarketplaceSelect = (pluginData: MarketplaceData) => {
+  const handleMarketplaceSelect = (pluginData: MarketplaceSelection) => {
     onSubmitMarketplace(pluginData);
   };
 
@@ -121,7 +124,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
   return (
     <div className="space-y-6">
       {currentTab === 'url' ? (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           <div>
             <div className="flex items-center space-x-2">
               <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -149,7 +152,10 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
                 type="url"
                 id="url"
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  onFormStateChange?.({ url: e.target.value });
+                }}
                 className={`block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors placeholder:text-gray-500 ${
                   errors.url ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                 } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
@@ -167,7 +173,10 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
 
           <PlatformSelector 
             value={platform.value} 
-            onChange={(value) => setPlatform(platforms.find(p => p.value === value) || platforms[0])}
+            onChange={(value) => {
+              setPlatform(platforms.find(p => p.value === value) || platforms[0]);
+              onFormStateChange?.({ platform: value });
+            }}
             className="mt-1"
           />
 
@@ -179,7 +188,10 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
               type="text"
               id="suffix"
               value={suffix}
-              onChange={(e) => setSuffix(e.target.value)}
+              onChange={(e) => {
+                setSuffix(e.target.value);
+                onFormStateChange?.({ suffix: e.target.value });
+              }}
               className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors placeholder:text-gray-500 ${
                 errors.suffix ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
               } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
@@ -234,7 +246,10 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
           
           <PlatformSelector 
             value={platform.value} 
-            onChange={(value) => setPlatform(platforms.find(p => p.value === value) || platforms[0])}
+            onChange={(value) => {
+              setPlatform(platforms.find(p => p.value === value) || platforms[0]);
+              onFormStateChange?.({ platform: value });
+            }}
             className="mt-1"
           />
 
@@ -246,7 +261,10 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSubmit, onSubmitMarketplace, 
               type="text"
               id="suffix"
               value={suffix}
-              onChange={(e) => setSuffix(e.target.value)}
+              onChange={(e) => {
+                setSuffix(e.target.value);
+                onFormStateChange?.({ suffix: e.target.value });
+              }}
               className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors placeholder:text-gray-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               placeholder="offline"
               disabled={isLoading}

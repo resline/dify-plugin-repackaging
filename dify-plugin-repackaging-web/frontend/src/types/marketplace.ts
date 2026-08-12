@@ -5,7 +5,8 @@
 
 export interface PluginVersion {
   version: string;
-  created_at: string; // ISO datetime string
+  created_at?: string;
+  release_date?: string;
   changelog?: string;
   download_count?: number;
 }
@@ -19,17 +20,19 @@ export interface PluginAuthor {
 export interface Plugin {
   name: string;
   author: string;
-  display_name: string;
-  description: string;
-  category: string;
-  tags: string[];
+  display_name?: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
   latest_version: string;
   icon_url?: string;
-  created_at: string; // ISO datetime string
-  updated_at: string; // ISO datetime string
+  version?: string;
+  created_at?: string;
+  updated_at?: string;
   download_count?: number;
+  downloads?: number;
   rating?: number;
-  verified: boolean;
+  verified?: boolean;
 }
 
 export interface PluginDetails extends Plugin {
@@ -37,7 +40,8 @@ export interface PluginDetails extends Plugin {
   license?: string;
   homepage_url?: string;
   repository_url?: string;
-  available_versions: PluginVersion[];
+  available_versions?: PluginVersion[];
+  versions?: Array<PluginVersion | string>;
   dependencies?: Record<string, string>;
   screenshots?: string[];
 }
@@ -48,6 +52,17 @@ export interface PluginSearchResult {
   page: number;
   per_page: number;
   has_more: boolean;
+  error?: string;
+  fallback_used?: boolean;
+  fallback_reason?: string;
+}
+
+export interface MarketplaceSearchParams {
+  q?: string;
+  category?: string;
+  author?: string;
+  page?: number;
+  per_page?: number;
 }
 
 export interface MarketplaceCategory {

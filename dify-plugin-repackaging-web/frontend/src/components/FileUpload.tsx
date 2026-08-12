@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Upload, X, FileText, CheckCircle, Loader2, FileX, Info } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Upload, X, FileText, CheckCircle, FileX, Info } from 'lucide-react';
 
 interface FileUploadProps {
   onFileSelect: (data: { file: File } | null) => void;
@@ -8,11 +8,21 @@ interface FileUploadProps {
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [dragCounter, setDragCounter] = useState(0);
+  const dragCounterRef = useRef(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const preparationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPreparation = useCallback(() => {
+    if (preparationIntervalRef.current !== null) {
+      clearInterval(preparationIntervalRef.current);
+      preparationIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => stopPreparation, [stopPreparation]);
 
   const validateFile = (file: File): string | null => {
     if (!file) return 'No file selected';
@@ -31,6 +41,33 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
     return null;
   };
 
+  const handleFile = useCallback((file: File) => {
+    const validationError = validateFile(file);
+    if (validationError) {
+      stopPreparation();
+      setError(validationError);
+      setSelectedFile(null);
+      onFileSelect(null);
+      return;
+    }
+
+    stopPreparation();
+    setError('');
+    setSelectedFile(file);
+    onFileSelect({ file });
+
+    setUploadProgress(0);
+    preparationIntervalRef.current = setInterval(() => {
+      setUploadProgress((current) => {
+        if (current >= 90) {
+          stopPreparation();
+          return 100;
+        }
+        return current + 10;
+      });
+    }, 100);
+  }, [onFileSelect, stopPreparation]);
+
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -39,7 +76,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
   const handleDragIn = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragCounter(prev => prev + 1);
+    dragCounterRef.current += 1;
     
     if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
       setDragActive(true);
@@ -49,25 +86,20 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
   const handleDragOut = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragCounter(prev => {
-      const newCounter = prev - 1;
-      if (newCounter === 0) {
-        setDragActive(false);
-      }
-      return newCounter;
-    });
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setDragActive(false);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    setDragCounter(0);
+    dragCounterRef.current = 0;
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    if (!isLoading && e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
-  }, []);
+  }, [handleFile, isLoading]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
@@ -76,38 +108,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
     }
   };
 
-  const handleFile = (file: File) => {
-    const validationError = validateFile(file);
-    if (validationError) {
-      setError(validationError);
-      setSelectedFile(null);
-      // Shake animation
-      const dropZone = document.getElementById('drop-zone');
-      if (dropZone) {
-        dropZone.classList.add('animate-shake');
-        setTimeout(() => dropZone.classList.remove('animate-shake'), 500);
-      }
-      return;
-    }
-    
-    setError('');
-    setSelectedFile(file);
-    onFileSelect({ file });
-    
-    // Show file preparation progress
-    setUploadProgress(0);
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 100);
-  };
-
   const removeFile = () => {
+    stopPreparation();
     setSelectedFile(null);
     setError('');
     setUploadProgress(0);
@@ -147,6 +149,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
           <input
             ref={fileInputRef}
             type="file"
+            aria-label="Choose a Dify plugin package"
             className="sr-only"
             onChange={handleChange}
             accept=".difypkg"

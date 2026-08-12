@@ -19,7 +19,7 @@ describe('File Service', () => {
       
       // Check file structure
       const file = result.files[0]
-      expect(file).toHaveProperty('id')
+      expect(file).toHaveProperty('file_id')
       expect(file).toHaveProperty('filename')
       expect(file).toHaveProperty('size')
       expect(file).toHaveProperty('created_at')
@@ -84,10 +84,10 @@ describe('File Service', () => {
     })
   })
 
-  describe('downloadFile', () => {
+  describe('getDownloadUrl', () => {
     it('returns correct download URL', () => {
       const fileId = 'test-file-123'
-      const url = fileService.downloadFile(fileId)
+      const url = fileService.getDownloadUrl(fileId)
       
       expect(url).toBe(`/api/v1/files/${fileId}/download`)
     })

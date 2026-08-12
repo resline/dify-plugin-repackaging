@@ -1,5 +1,4 @@
 import os
-import subprocess
 import asyncio
 from typing import Tuple, AsyncGenerator
 from app.core.config import settings
@@ -9,6 +8,32 @@ logger = logging.getLogger(__name__)
 
 
 class RepackageService:
+    @staticmethod
+    def _decode_output_line(line: bytes) -> str:
+        """Decode subprocess logs without allowing terminal encoding to fail a task."""
+        return line.decode("utf-8", errors="replace").strip()
+
+    @staticmethod
+    async def _stop_process(process) -> None:
+        """Stop a still-running subprocess before retrying or cancelling a task."""
+        if process is None or process.returncode is not None:
+            return
+
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            await process.wait()
+            return
+
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            await process.wait()
+
     @staticmethod
     async def repackage_plugin(
         file_path: str, 
@@ -35,6 +60,7 @@ class RepackageService:
         base_delay = 2.0  # seconds
         
         for attempt in range(max_retries):
+            process = None
             try:
                 logger.info(f"Starting repackaging (attempt {attempt + 1}/{max_retries})")
                 
@@ -68,14 +94,14 @@ class RepackageService:
                         line = await asyncio.wait_for(process.stdout.readline(), timeout=300.0)
                     except asyncio.TimeoutError:
                         logger.error("Timeout waiting for script output")
-                        process.terminate()
-                        await process.wait()
+                        await RepackageService._stop_process(process)
+                        process = None
                         raise RuntimeError("Repackaging timeout - process appears to be hanging")
                     
                     if not line:
                         break
                         
-                    line_str = line.decode('utf-8').strip()
+                    line_str = RepackageService._decode_output_line(line)
                     logger.info(f"Script output: {line_str}")
                     collected_output.append(line_str)
                     
@@ -134,11 +160,10 @@ class RepackageService:
                 
             except asyncio.CancelledError:
                 # Handle cancellation gracefully
-                if 'process' in locals():
-                    process.terminate()
-                    await process.wait()
+                await RepackageService._stop_process(process)
                 raise
             except Exception as e:
+                await RepackageService._stop_process(process)
                 if attempt < max_retries - 1:
                     delay = base_delay * (2 ** attempt)
                     logger.warning(f"Repackaging error: {e}. Retrying in {delay}s...")

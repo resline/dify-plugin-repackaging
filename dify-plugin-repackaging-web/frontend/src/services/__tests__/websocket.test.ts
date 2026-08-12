@@ -1,340 +1,179 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ReconnectingWebSocket, createReconnectingWebSocket, WebSocketState } from '../websocket'
-import { waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createReconnectingWebSocket,
+  ReconnectingWebSocket,
+  WebSocketState,
+} from '../websocket'
+import {
+  MockWebSocket,
+  WebSocketConstructorMock,
+} from '../../test/mocks/websocket'
 
-describe('WebSocket Service', () => {
-  let ws: ReconnectingWebSocket
-  const mockCallbacks = {
+describe('WebSocket service', () => {
+  let socket: ReconnectingWebSocket | undefined
+  const callbacks = {
     onOpen: vi.fn(),
     onMessage: vi.fn(),
     onError: vi.fn(),
-    onClose: vi.fn()
+    onClose: vi.fn(),
   }
 
   beforeEach(() => {
-    vi.clearAllMocks()
     vi.useFakeTimers()
   })
 
   afterEach(() => {
-    if (ws) {
-      ws.close()
-    }
+    socket?.close()
     vi.useRealTimers()
   })
 
-  describe('ReconnectingWebSocket', () => {
-    it('connects to the correct URL', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      expect(global.WebSocket).toHaveBeenCalledWith(
-        expect.stringContaining('/ws/tasks/test-123')
-      )
-    })
-
-    it('calls onOpen when connected', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      expect(mockCallbacks.onOpen).toHaveBeenCalled()
-    })
-
-    it('calls onMessage when receiving messages', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-      const testMessage = { type: 'log', message: 'Test message' }
-
-      mockWs.onmessage(new MessageEvent('message', {
-        data: JSON.stringify(testMessage)
-      }))
-
-      expect(mockCallbacks.onMessage).toHaveBeenCalledWith(testMessage)
-    })
-
-    it('handles ping/pong messages internally', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-      const sendSpy = vi.spyOn(mockWs, 'send')
-
-      // Receive ping from server
-      mockWs.onmessage(new MessageEvent('message', {
-        data: JSON.stringify({ type: 'ping' })
-      }))
-
-      // Should send pong response
-      expect(sendSpy).toHaveBeenCalledWith(
-        expect.stringContaining('"type":"pong"')
-      )
-
-      // Should not call user's onMessage for ping
-      expect(mockCallbacks.onMessage).not.toHaveBeenCalled()
-    })
-
-    it('sends heartbeat messages periodically', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        heartbeatInterval: 1000,
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-      const sendSpy = vi.spyOn(mockWs, 'send')
-
-      // Advance time to trigger heartbeat
-      await vi.advanceTimersByTimeAsync(1100)
-
-      expect(sendSpy).toHaveBeenCalledWith(
-        expect.stringContaining('"type":"ping"')
-      )
-    })
-
-    it('attempts to reconnect on disconnection', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        autoReconnect: true,
-        reconnectInterval: 1000,
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-
-      // Simulate disconnection
-      mockWs.onclose(new CloseEvent('close', { code: 1006 }))
-
-      expect(mockCallbacks.onClose).toHaveBeenCalled()
-
-      // Clear previous WebSocket calls
-      vi.clearAllMocks()
-
-      // Advance time to trigger reconnect
-      await vi.advanceTimersByTimeAsync(1100)
-
-      // Should create new WebSocket connection
-      expect(global.WebSocket).toHaveBeenCalledWith(
-        expect.stringContaining('/ws/tasks/test-123')
-      )
-    })
-
-    it('does not reconnect when manually closed', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        autoReconnect: true,
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      // Manually close
-      ws.close()
-
-      vi.clearAllMocks()
-
-      // Advance time
-      await vi.advanceTimersByTimeAsync(5000)
-
-      // Should not create new connection
-      expect(global.WebSocket).not.toHaveBeenCalled()
-    })
-
-    it('respects maximum reconnect attempts', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        autoReconnect: true,
-        reconnectInterval: 100,
-        maxReconnectAttempts: 3,
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-
-      // Simulate multiple disconnections
-      for (let i = 0; i < 4; i++) {
-        mockWs.onclose(new CloseEvent('close', { code: 1006 }))
-        await vi.advanceTimersByTimeAsync(200)
-      }
-
-      // Should only attempt 3 reconnections
-      expect(global.WebSocket).toHaveBeenCalledTimes(4) // 1 initial + 3 reconnects
-    })
-
-    it('does not reconnect for "Task not found" error', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        autoReconnect: true,
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-
-      // Simulate "Task not found" close event
-      mockWs.onclose(new CloseEvent('close', { code: 1008, reason: 'Task not found' }))
-
-      vi.clearAllMocks()
-
-      // Advance time
-      await vi.advanceTimersByTimeAsync(5000)
-
-      // Should not attempt reconnection
-      expect(global.WebSocket).not.toHaveBeenCalled()
-    })
-
-    it('exponentially backs off reconnect attempts', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        autoReconnect: true,
-        reconnectInterval: 1000,
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-
-      // First disconnection
-      mockWs.onclose(new CloseEvent('close', { code: 1006 }))
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('1000ms')
-      )
-
-      await vi.advanceTimersByTimeAsync(1100)
-
-      // Second disconnection
-      const mockWs2 = (global.WebSocket as any).mock.results[1].value
-      mockWs2.onclose(new CloseEvent('close', { code: 1006 }))
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('1500ms')
-      )
-
-      consoleSpy.mockRestore()
-    })
-
-    it('sends messages when connected', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-      const sendSpy = vi.spyOn(mockWs, 'send')
-
-      const testData = { type: 'custom', data: 'test' }
-      ws.send(testData)
-
-      expect(sendSpy).toHaveBeenCalledWith(JSON.stringify(testData))
-    })
-
-    it('does not send messages when disconnected', async () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      const mockWs = (global.WebSocket as any).mock.results[0].value
-      mockWs.readyState = WebSocket.CLOSED
-
-      ws.send({ type: 'test' })
-
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        'WebSocket is not open, cannot send message'
-      )
-
-      consoleWarnSpy.mockRestore()
-    })
-
-    it('reports connection state correctly', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        ...mockCallbacks
-      })
-
-      expect(ws.isConnected()).toBe(false)
-      expect(ws.getReadyState()).toBe(WebSocket.CONNECTING)
-
-      await vi.runOnlyPendingTimersAsync()
-
-      expect(ws.isConnected()).toBe(true)
-      expect(ws.getReadyState()).toBe(WebSocket.OPEN)
-
-      ws.close()
-
-      expect(ws.isConnected()).toBe(false)
-      expect(ws.getReadyState()).toBe(WebSocket.CLOSED)
-    })
-
-    it('reconnects when no pong received', async () => {
-      ws = new ReconnectingWebSocket({
-        taskId: 'test-123',
-        heartbeatInterval: 1000,
-        ...mockCallbacks
-      })
-
-      await vi.runOnlyPendingTimersAsync()
-
-      // Advance time past heartbeat interval * 2 without pong
-      await vi.advanceTimersByTimeAsync(2100)
-
-      // Should trigger reconnection
-      expect(global.WebSocket).toHaveBeenCalledTimes(2)
-    })
+  const connect = (options: ConstructorParameters<typeof ReconnectingWebSocket>[0] = { taskId: 'test-123' }) => {
+    socket = new ReconnectingWebSocket({ ...callbacks, ...options })
+    return MockWebSocket.instances[MockWebSocket.instances.length - 1]
+  }
+
+  it('connects to the task URL and exposes connection state', () => {
+    const transport = connect({ taskId: 'test-123' })
+
+    expect(WebSocketConstructorMock).toHaveBeenCalledWith(
+      expect.stringMatching(/^ws:\/\/.*\/ws\/tasks\/test-123$/)
+    )
+    expect(socket!.getReadyState()).toBe(WebSocket.CONNECTING)
+    expect(socket!.isConnected()).toBe(false)
+
+    transport.serverOpen()
+    expect(callbacks.onOpen).toHaveBeenCalledOnce()
+    expect(socket!.getReadyState()).toBe(WebSocket.OPEN)
+    expect(socket!.isConnected()).toBe(true)
   })
 
-  describe('createReconnectingWebSocket', () => {
-    it('creates WebSocket with merged options', async () => {
-      ws = createReconnectingWebSocket('test-123', {
-        onOpen: mockCallbacks.onOpen,
-        heartbeatInterval: 5000
-      })
+  it('parses application messages and forwards socket errors', () => {
+    const transport = connect()
+    transport.serverOpen()
+    transport.serverMessage({ type: 'log', message: 'Test message' })
+    transport.serverError()
 
-      await vi.runOnlyPendingTimersAsync()
-
-      expect(mockCallbacks.onOpen).toHaveBeenCalled()
-      expect(ws).toBeInstanceOf(ReconnectingWebSocket)
-    })
+    expect(callbacks.onMessage).toHaveBeenCalledWith({ type: 'log', message: 'Test message' })
+    expect(callbacks.onError).toHaveBeenCalledWith(expect.any(Event))
   })
 
-  describe('WebSocketState', () => {
-    it('exports correct WebSocket state constants', () => {
-      expect(WebSocketState.CONNECTING).toBe(0)
-      expect(WebSocketState.OPEN).toBe(1)
-      expect(WebSocketState.CLOSING).toBe(2)
-      expect(WebSocketState.CLOSED).toBe(3)
+  it('answers server ping without forwarding it', () => {
+    const transport = connect()
+    transport.serverOpen()
+
+    transport.serverMessage({ type: 'ping' })
+
+    expect(transport.send).toHaveBeenCalledWith(expect.stringContaining('"type":"pong"'))
+    expect(callbacks.onMessage).not.toHaveBeenCalled()
+  })
+
+  it('sends heartbeat pings periodically', async () => {
+    const transport = connect({ taskId: 'test-123', heartbeatInterval: 1_000 })
+    transport.serverOpen()
+
+    await vi.advanceTimersByTimeAsync(1_000)
+
+    expect(transport.send).toHaveBeenCalledWith(expect.stringContaining('"type":"ping"'))
+  })
+
+  it('reconnects after an unexpected close using exponential backoff', async () => {
+    const first = connect({
+      taskId: 'test-123',
+      reconnectInterval: 1_000,
+      maxReconnectAttempts: 3,
     })
+
+    first.serverClose(1006)
+    expect(callbacks.onClose).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(999)
+    expect(MockWebSocket.instances).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(MockWebSocket.instances).toHaveLength(2)
+
+    MockWebSocket.instances[1].serverClose(1006)
+    await vi.advanceTimersByTimeAsync(1_499)
+    expect(MockWebSocket.instances).toHaveLength(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(MockWebSocket.instances).toHaveLength(3)
+  })
+
+  it('stops after the configured number of consecutive reconnect attempts', async () => {
+    connect({ taskId: 'test-123', reconnectInterval: 100, maxReconnectAttempts: 2 })
+
+    MockWebSocket.instances[0].serverClose(1006)
+    await vi.advanceTimersByTimeAsync(100)
+    MockWebSocket.instances[1].serverClose(1006)
+    await vi.advanceTimersByTimeAsync(150)
+    MockWebSocket.instances[2].serverClose(1006)
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(MockWebSocket.instances).toHaveLength(3)
+  })
+
+  it('does not reconnect after a manual close or a missing-task response', async () => {
+    connect({ taskId: 'test-123', reconnectInterval: 100 })
+    socket!.close()
+    await vi.runOnlyPendingTimersAsync()
+    expect(MockWebSocket.instances).toHaveLength(1)
+
+    socket = undefined
+    const missingTask = connect({ taskId: 'missing', reconnectInterval: 100 })
+    missingTask.serverClose(1008, 'Task not found')
+    await vi.runOnlyPendingTimersAsync()
+    expect(MockWebSocket.instances).toHaveLength(2)
+  })
+
+  it('ends reconnects and requests login when the WebSocket session expires', async () => {
+    const unauthorized = vi.fn()
+    window.addEventListener('auth:unauthorized', unauthorized)
+    const transport = connect({ taskId: 'expired', reconnectInterval: 100 })
+
+    transport.serverClose(1008, 'Authentication required')
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(unauthorized).toHaveBeenCalledOnce()
+    expect((unauthorized.mock.calls[0][0] as CustomEvent).detail).toMatch(/session expired/i)
+    window.removeEventListener('auth:unauthorized', unauthorized)
+  })
+
+  it('manual reconnect creates exactly one replacement transport', () => {
+    connect()
+    socket!.reconnect()
+    expect(MockWebSocket.instances).toHaveLength(2)
+  })
+
+  it('reconnects when heartbeat acknowledgements stop', async () => {
+    const transport = connect({ taskId: 'test-123', heartbeatInterval: 1_000 })
+    transport.serverOpen()
+
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    expect(MockWebSocket.instances).toHaveLength(2)
+  })
+
+  it('sends serialized data only while connected', () => {
+    const transport = connect()
+    socket!.send({ type: 'ignored' })
+    expect(transport.send).not.toHaveBeenCalled()
+
+    transport.serverOpen()
+    socket!.send({ type: 'custom', value: 1 })
+    expect(transport.send).toHaveBeenCalledWith('{"type":"custom","value":1}')
+  })
+
+  it('factory creates a reconnecting socket with merged options', () => {
+    socket = createReconnectingWebSocket('factory-task', {
+      onOpen: callbacks.onOpen,
+      heartbeatInterval: 5_000,
+    })
+    MockWebSocket.instances[0].serverOpen()
+
+    expect(socket).toBeInstanceOf(ReconnectingWebSocket)
+    expect(callbacks.onOpen).toHaveBeenCalledOnce()
+  })
+
+  it('exports browser-compatible state constants', () => {
+    expect(WebSocketState).toEqual({ CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 })
   })
 })

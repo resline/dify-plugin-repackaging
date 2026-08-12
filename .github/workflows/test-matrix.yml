@@ -25,50 +25,29 @@ jobs:
               {
                 "os": "ubuntu-latest",
                 "python": "3.11",
-                "node": "18",
+                "node": "22",
                 "platform": "linux/amd64",
                 "redis": "6"
               },
               {
                 "os": "ubuntu-latest",
                 "python": "3.11",
-                "node": "20",
+                "node": "24",
                 "platform": "linux/amd64",
                 "redis": "7"
               },
               {
                 "os": "ubuntu-latest",
                 "python": "3.12",
-                "node": "18",
+                "node": "22",
                 "platform": "linux/amd64",
                 "redis": "6"
               },
               {
                 "os": "ubuntu-latest",
                 "python": "3.12",
-                "node": "20",
+                "node": "24",
                 "platform": "linux/amd64",
-                "redis": "7"
-              },
-              {
-                "os": "ubuntu-latest",
-                "python": "3.12",
-                "node": "20",
-                "platform": "linux/arm64",
-                "redis": "7"
-              },
-              {
-                "os": "macos-latest",
-                "python": "3.12",
-                "node": "20",
-                "platform": "darwin/amd64",
-                "redis": "7"
-              },
-              {
-                "os": "macos-13",
-                "python": "3.12",
-                "node": "20",
-                "platform": "darwin/arm64",
                 "redis": "7"
               }
             ]
@@ -95,8 +74,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        # Only run Redis service on Linux
-        if: startsWith(matrix.os, 'ubuntu')
 
     steps:
       - name: Checkout code
@@ -111,12 +88,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-
-      - name: Install Redis (macOS)
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          brew install redis
-          brew services start redis
 
       - name: Cache Python dependencies
         uses: actions/cache@v4

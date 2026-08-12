@@ -1,15 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-interface Task {
-  task_id: string;
-  // Add other task properties as needed
-}
+import type { RepackageFormData, TabId, Task } from '../types/app';
 
 interface AppState {
   // Tab navigation
-  currentTab: string;
-  setCurrentTab: (tab: string) => void;
+  currentTab: TabId;
+  setCurrentTab: (tab: TabId) => void;
   
   // Task management
   currentTask: Task | null;
@@ -28,11 +24,7 @@ interface AppState {
   setProcessingPanelMinimized: (minimized: boolean) => void;
   
   // Form state preservation
-  formState: {
-    url: string;
-    platform: string;
-    suffix: string;
-  };
+  formState: RepackageFormData;
   setFormState: (state: Partial<AppState['formState']>) => void;
 }
 

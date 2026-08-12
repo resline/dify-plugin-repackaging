@@ -6,7 +6,9 @@ Focus on uncovered code paths and edge cases.
 import pytest
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from fastapi import HTTPException
+from fastapi import UploadFile
 from httpx import AsyncClient
+from starlette.requests import Request
 import json
 import uuid
 from datetime import datetime
@@ -22,6 +24,13 @@ from app.api.v1.endpoints.tasks import (
 from app.models.task import TaskStatus, MarketplaceTaskCreate
 from app.services.marketplace import MarketplaceService
 from tests.factories.plugin import TaskFactory
+
+
+@pytest.fixture(autouse=True)
+def patch_tasks_redis(mock_redis):
+    """Keep endpoint tests isolated from the developer's Redis instance."""
+    with patch("app.api.v1.endpoints.tasks.redis_client", mock_redis):
+        yield mock_redis
 
 
 class TestCreateTaskEndpoint:
@@ -248,50 +257,34 @@ class TestUploadTaskEndpoint:
         
         # Assert
         assert response.status_code == 400
-        assert "Only .difypkg files are allowed" in response.json()["detail"]
+        assert "must end with .difypkg" in response.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_upload_task_file_too_large(self, async_client: AsyncClient):
+    async def test_upload_task_file_too_large(self):
         """Test uploading file that exceeds size limit."""
         # Arrange
         # Create a mock file object that reports large size
-        large_content = b"x" * 1024  # Small actual content
-        
         class MockLargeFile:
-            def __init__(self, content):
-                self.content = content
+            def __init__(self):
                 self.position = 0
-                
-            def read(self, size=-1):
-                if size == -1:
-                    return self.content
-                return self.content[:size]
-                
+
             def seek(self, offset, whence=0):
                 if whence == 2:  # SEEK_END
                     self.position = 101 * 1024 * 1024  # Report 101MB
                 else:
                     self.position = offset
-                    
+
             def tell(self):
                 return self.position
-        
-        mock_file = MockLargeFile(large_content)
-        
-        files = {
-            "file": ("large.difypkg", mock_file, "application/zip")
-        }
-        data = {
-            "platform": "",
-            "suffix": "offline"
-        }
-        
-        # Act
-        response = await async_client.post("/api/v1/tasks/upload", files=files, data=data)
-        
-        # Assert
-        assert response.status_code == 400
-        assert "File size must be less than 100MB" in response.json()["detail"]
+
+        request = Request({"type": "http", "method": "POST", "path": "/api/v1/tasks/upload", "headers": []})
+        upload = UploadFile(filename="large.difypkg", file=MockLargeFile())
+
+        with pytest.raises(HTTPException) as exc_info:
+            await upload_task.__wrapped__(request, upload, platform="", suffix="offline")
+
+        assert exc_info.value.status_code == 400
+        assert "File size must be less than 100MB" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_upload_task_successful(self, async_client: AsyncClient, mock_redis, temp_directory):
@@ -647,12 +640,12 @@ class TestTaskCreateWithMarketplaceValidation:
         """Test creating task with valid URL."""
         task = TaskCreateWithMarketplace(
             url="https://example.com/plugin.difypkg",
-            platform="linux",
+            platform="manylinux2014_x86_64",
             suffix="custom"
         )
         assert task.url == "https://example.com/plugin.difypkg"
         assert task.marketplace_plugin is None
-        assert task.platform == "linux"
+        assert task.platform == "manylinux2014_x86_64"
         assert task.suffix == "custom"
 
     def test_task_create_with_marketplace_valid_plugin(self):

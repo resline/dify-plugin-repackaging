@@ -1,5 +1,5 @@
 export interface FileInfo {
-  id: string;
+  file_id: string;
   filename: string;
   size: number;
   created_at: string;
@@ -15,4 +15,12 @@ export interface FileInfo {
 export interface FileListResponse {
   files: FileInfo[];
   total: number;
+  limit: number;
+  offset: number;
+  has_more?: boolean;
+}
+
+export interface DeleteFileResponse {
+  message: string;
+  file_id: string;
 }
