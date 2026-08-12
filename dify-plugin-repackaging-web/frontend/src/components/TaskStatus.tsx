@@ -13,9 +13,16 @@ interface TaskStatusProps {
   onComplete: (task: any) => void;
   onError: (error: string) => void;
   onNewTask: () => void;
+  onStatusChange?: (task: any) => void;
 }
 
-const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, onNewTask }) => {
+const TaskStatus: React.FC<TaskStatusProps> = ({
+  taskId,
+  onComplete,
+  onError,
+  onNewTask,
+  onStatusChange
+}) => {
   const [task, setTask] = useState<any>(null);
   const [wsStatus, setWsStatus] = useState<WebSocketConnectionState>('connecting');
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
@@ -33,11 +40,19 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
   const onErrorRef = useRef(onError);
   const successRef = useRef(success);
   const showErrorRef = useRef(showError);
+  const onStatusChangeRef = useRef(onStatusChange);
 
   onCompleteRef.current = onComplete;
   onErrorRef.current = onError;
   successRef.current = success;
   showErrorRef.current = showError;
+  onStatusChangeRef.current = onStatusChange;
+
+  const updateTask = (nextTask: any) => {
+    taskRef.current = nextTask;
+    setTask(nextTask);
+    onStatusChangeRef.current?.(nextTask);
+  };
 
   // Handle responsive log height
   useEffect(() => {
@@ -74,8 +89,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
       },
       onMessage: (data) => {
         if (data.type !== 'heartbeat' && data.type !== 'ping' && data.type !== 'pong') {
-          taskRef.current = data;
-          setTask(data);
+          updateTask(data);
           
           // Add log entry for status changes and messages
           if (data.message || data.status) {
@@ -171,8 +185,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ taskId, onComplete, onError, on
         return;
       }
       
-      taskRef.current = data;
-      setTask(data);
+      updateTask(data);
       
       // Add initial log entry if this is the first fetch
       if (forceInitialLog || logs.length === 0) {

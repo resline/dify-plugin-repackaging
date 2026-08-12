@@ -15,8 +15,7 @@ import useDeepLink from './hooks/useDeepLink';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import useAppStore from './stores/appStore';
 
-function AppContent() {
-  const { isAuthenticated } = useAuth();
+function AuthenticatedApp() {
   const { toasts, success, error, removeToast } = useToast();
   const deepLinkData = useDeepLink();
   const processedDeepLinksRef = useRef(new Set());
@@ -33,11 +32,6 @@ function AppContent() {
     setFormState
   } = useAppStore();
 
-  // Show login form if not authenticated
-  if (!isAuthenticated) {
-    return <LoginForm />;
-  }
-  
   // Initialize tab from deep link if needed
   useEffect(() => {
     if (deepLinkData?.type === 'marketplace' && currentTab !== 'marketplace') {
@@ -301,6 +295,12 @@ function AppContent() {
       </Layout>
     </>
   );
+}
+
+function AppContent() {
+  const { isAuthenticated } = useAuth();
+
+  return isAuthenticated ? <AuthenticatedApp /> : <LoginForm />;
 }
 
 function App() {
