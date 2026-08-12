@@ -5,15 +5,14 @@ Handles both API and web scraping with caching and retry logic
 
 import httpx
 from bs4 import BeautifulSoup
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Any
 import json
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import asyncio
-from urllib.parse import urljoin, urlparse, parse_qs
+from urllib.parse import urljoin
 import hashlib
-from app.core.config import settings
 from app.workers.celery_app import redis_client
 
 logger = logging.getLogger(__name__)
@@ -88,7 +87,7 @@ class MarketplaceScraper:
         # Check cache first
         cached_result = self._get_from_cache(cache_key)
         if cached_result:
-            logger.info(f"Returning cached scraped plugin list")
+            logger.info("Returning cached scraped plugin list")
             return cached_result
         
         try:
