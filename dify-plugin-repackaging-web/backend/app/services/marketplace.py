@@ -265,8 +265,10 @@ class MarketplaceService:
                 if last_error:
                     raise last_error
                     
-        except (httpx.HTTPError, CircuitOpenError) as e:
-            # API is not working - try web scraping fallback
+        except (httpx.HTTPError, CircuitOpenError, ValueError) as e:
+            # A ValueError is raised when the marketplace responds with HTML or
+            # otherwise invalid JSON. That is also an API compatibility failure,
+            # so use the scraper instead of turning it into a 500 response.
             if isinstance(e, CircuitOpenError):
                 logger.warning("Circuit breaker is open, falling back to web scraper.")
             else:
@@ -445,7 +447,7 @@ class MarketplaceService:
 
                 return mapped_versions
                 
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, CircuitOpenError, ValueError) as e:
             logger.error(f"Error getting plugin versions for {author}/{name}: {e}")
             
             # Try web scraping fallback

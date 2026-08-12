@@ -5,15 +5,14 @@ Handles both API and web scraping with caching and retry logic
 
 import httpx
 from bs4 import BeautifulSoup
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Any
 import json
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import asyncio
-from urllib.parse import urljoin, urlparse, parse_qs
+from urllib.parse import urljoin
 import hashlib
-from app.core.config import settings
 from app.workers.celery_app import redis_client
 
 logger = logging.getLogger(__name__)
@@ -88,7 +87,7 @@ class MarketplaceScraper:
         # Check cache first
         cached_result = self._get_from_cache(cache_key)
         if cached_result:
-            logger.info(f"Returning cached scraped plugin list")
+            logger.info("Returning cached scraped plugin list")
             return cached_result
         
         try:
@@ -273,7 +272,12 @@ class MarketplaceScraper:
                     # Get first option as latest version
                     first_option = version_elem.select_one('option')
                     if first_option:
-                        details['latest_version'] = first_option.get_text(strip=True)
+                        # Option labels carry decoration like "v0.0.9 (latest)",
+                        # so normalise the same way as the text branch below.
+                        opt_text = first_option.get_text(strip=True)
+                        ver_match = re.search(r'(\d+\.\d+\.\d+)', opt_text)
+                        if ver_match:
+                            details['latest_version'] = ver_match.group(1)
                 else:
                     ver_text = version_elem.get_text(strip=True)
                     ver_match = re.search(r'(\d+\.\d+\.\d+)', ver_text)
