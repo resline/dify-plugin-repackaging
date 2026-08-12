@@ -1,171 +1,85 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, renderHook } from '@testing-library/react'
 import { useCopyToClipboard } from '../useCopyToClipboard'
 
-// Mock the Toast hook
+const toast = vi.hoisted(() => ({
+  copy: vi.fn(),
+  error: vi.fn(),
+}))
+
 vi.mock('../../components/Toast', () => ({
-  useToast: () => ({
-    copy: vi.fn(),
-    error: vi.fn(),
-    success: vi.fn(),
-    warning: vi.fn()
-  })
+  useToast: () => ({ ...toast, success: vi.fn(), warning: vi.fn() }),
 }))
 
 describe('useCopyToClipboard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset clipboard mock
     vi.mocked(navigator.clipboard.writeText).mockResolvedValue(undefined)
   })
 
-  it('initializes with not copied state', () => {
+  it('starts idle and copies text with a success notification', async () => {
     const { result } = renderHook(() => useCopyToClipboard())
-    const { isCopying } = result.current
-    
-    expect(isCopying).toBe(false)
-  })
-
-  it('copies text to clipboard successfully', async () => {
-    const { result } = renderHook(() => useCopyToClipboard())
-    const { copy } = result.current
-    
-    await act(async () => {
-      await copy('test text')
-    })
-    
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('test text')
-  })
-
-  it('resets copied state after timeout', async () => {
-    vi.useFakeTimers()
-    const { result } = renderHook(() => useCopyToClipboard())
-    const { copy } = result.current
-    
-    await act(async () => {
-      await copy('test text')
-    })
-    
-    // The hook doesn't expose isCopied state, so we can't test this directly
-    // Just ensure the copy operation completes without error
-    
-    vi.useRealTimers()
-  })
-
-  it('handles clipboard API errors gracefully', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    vi.mocked(navigator.clipboard.writeText).mockRejectedValue(new Error('Clipboard error'))
-    
-    const { result } = renderHook(() => useCopyToClipboard())
-    const { copy } = result.current
-    
-    await act(async () => {
-      await copy('test text')
-    })
-    
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Failed to copy:',
-      expect.any(Error)
-    )
-    
-    consoleErrorSpy.mockRestore()
-  })
-
-  it('cancels previous timeout when copying again', async () => {
-    vi.useFakeTimers()
-    const { result } = renderHook(() => useCopyToClipboard())
-    const { copy } = result.current
-    
-    // First copy
-    await act(async () => {
-      await copy('first text')
-    })
-    
-    expect(result.current.isCopying).toBe(true)
-    
-    // Advance time partially
-    act(() => {
-      vi.advanceTimersByTime(1000)
-    })
-    
-    // Second copy before timeout
-    await act(async () => {
-      await copy('second text')
-    })
-    
-    // Advance time past original timeout
-    act(() => {
-      vi.advanceTimersByTime(1500)
-    })
-    
-    // Should still be true because new timeout was set
-    expect(result.current.isCopying).toBe(true)
-    
-    // Advance to new timeout
-    act(() => {
-      vi.advanceTimersByTime(600)
-    })
-    
     expect(result.current.isCopying).toBe(false)
-    
-    vi.useRealTimers()
+
+    await act(() => result.current.copy('test text', 'Done'))
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('test text')
+    expect(toast.copy).toHaveBeenCalledWith('Done')
+    expect(result.current.isCopying).toBe(false)
   })
 
-  it('handles empty string', async () => {
+  it('reports in-flight state and ignores a concurrent copy', async () => {
+    let resolveCopy!: () => void
+    vi.mocked(navigator.clipboard.writeText).mockImplementation(
+      () => new Promise<void>((resolve) => { resolveCopy = resolve })
+    )
     const { result } = renderHook(() => useCopyToClipboard())
-    const { copy } = result.current
-    
-    await act(async () => {
-      await copy('')
-    })
-    
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('')
-    expect(result.current.isCopying).toBe(true)
-  })
 
-  it('handles special characters', async () => {
-    const { result } = renderHook(() => useCopyToClipboard())
-    const { copy } = result.current
-    
-    const specialText = 'Test with "quotes" and \nnewlines\tand\ttabs'
-    
-    await act(async () => {
-      await copy(specialText)
-    })
-    
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(specialText)
-    expect(result.current.isCopying).toBe(true)
-  })
-
-  it('maintains stable function reference', () => {
-    const { result, rerender } = renderHook(() => useCopyToClipboard())
-    const { copy: copy1 } = result.current
-    
-    rerender()
-    
-    const { copy: copy2 } = result.current
-    
-    expect(copy1).toBe(copy2)
-  })
-
-  it('cleans up timeout on unmount', async () => {
-    vi.useFakeTimers()
-    const { result, unmount } = renderHook(() => useCopyToClipboard())
-    const { copy } = result.current
-    
-    await act(async () => {
-      await copy('test text')
-    })
-    
-    unmount()
-    
-    // Advance time - should not cause any errors
+    let firstCopy!: Promise<void>
     act(() => {
-      vi.advanceTimersByTime(3000)
+      firstCopy = result.current.copy('first')
     })
-    
-    // No assertion needed - just ensuring no errors occur
-    
-    vi.useRealTimers()
+    expect(result.current.isCopying).toBe(true)
+
+    await act(() => result.current.copy('second'))
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveCopy()
+      await firstCopy
+    })
+    expect(result.current.isCopying).toBe(false)
+  })
+
+  it('shows an error and returns to idle when the Clipboard API fails', async () => {
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValue(new Error('Clipboard error'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { result } = renderHook(() => useCopyToClipboard())
+
+    await act(() => result.current.copy('test'))
+
+    expect(consoleError).toHaveBeenCalledWith('Failed to copy:', expect.any(Error))
+    expect(toast.error).toHaveBeenCalledWith('Failed to copy to clipboard')
+    expect(result.current.isCopying).toBe(false)
+  })
+
+  it('uses the textarea fallback in an insecure context', async () => {
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: false })
+    const execCommand = vi.fn(() => true)
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
+    const { result } = renderHook(() => useCopyToClipboard())
+
+    await act(() => result.current.copy('fallback text'))
+
+    expect(execCommand).toHaveBeenCalledWith('copy')
+    expect(toast.copy).toHaveBeenCalledWith('Copied to clipboard!')
+    expect(document.querySelector('textarea')).not.toBeInTheDocument()
+  })
+
+  it('keeps the copy callback stable across rerenders', () => {
+    const { result, rerender } = renderHook(() => useCopyToClipboard())
+    const first = result.current.copy
+    rerender()
+    expect(result.current.copy).toBe(first)
   })
 })

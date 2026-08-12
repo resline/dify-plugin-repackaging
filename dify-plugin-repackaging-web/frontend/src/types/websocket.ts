@@ -4,7 +4,7 @@
 
 export interface WebSocketMessage {
   type: string;
-  timestamp?: number;
+  timestamp?: number | string;
   [key: string]: any;
 }
 

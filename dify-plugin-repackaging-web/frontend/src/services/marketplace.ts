@@ -1,5 +1,11 @@
 import { createAxiosWithRetry } from './utils/retry';
 import { withErrorHandling, toApiError } from './utils/errorHandler';
+import type {
+  MarketplaceSearchParams,
+  PluginDetails,
+  PluginSearchResult,
+  PluginVersion,
+} from '../types/marketplace';
 
 const API_BASE_URL = '/api/v1';
 
@@ -41,37 +47,8 @@ const api = createAxiosWithRetry(
 );
 
 
-interface SearchParams {
-  q?: string;
-  category?: string;
-  author?: string;
-  page?: number;
-  per_page?: number;
-}
-
-interface Plugin {
-  author: string;
-  name: string;
-  description?: string;
-  latest_version: string;
-  category?: string;
-  icon_url?: string;
-}
-
-interface SearchResult {
-  plugins: Plugin[];
-  total: number;
-  page: number;
-  per_page: number;
-}
-
-interface Version {
-  version: string;
-  release_date?: string;
-}
-
 interface VersionsResult {
-  versions: Version[];
+  versions: PluginVersion[];
 }
 
 interface CategoriesResult {
@@ -109,8 +86,8 @@ export const marketplaceService = {
    * Search for plugins in the marketplace
    */
   searchPlugins: withErrorHandling(
-    async (params: SearchParams = {}): Promise<SearchResult> => {
-      const response = await api.get<SearchResult>('/marketplace/plugins', { 
+    async (params: MarketplaceSearchParams = {}): Promise<PluginSearchResult> => {
+      const response = await api.get<PluginSearchResult>('/marketplace/plugins', {
         params,
         timeout: 30000  // 30 second timeout
       });
@@ -123,11 +100,12 @@ export const marketplaceService = {
       
       // Ensure required fields exist with defaults
       return {
+        ...data,
         plugins: Array.isArray(data.plugins) ? data.plugins : [],
         total: data.total || 0,
         page: data.page || params.page || 1,
         per_page: data.per_page || params.per_page || 20,
-        ...data  // Include any additional fields like error, fallback_used, etc.
+        has_more: data.has_more ?? false,
       };
     },
     {
@@ -136,9 +114,10 @@ export const marketplaceService = {
         plugins: [],
         total: 0,
         page: 1,
-        per_page: 20
+        per_page: 20,
+        has_more: false,
       },
-      rethrow: false
+      rethrow: true
     }
   ),
 
@@ -146,8 +125,8 @@ export const marketplaceService = {
    * Get detailed information about a specific plugin
    */
   getPluginDetails: withErrorHandling(
-    async (author: string, name: string): Promise<Plugin> => {
-      const response = await api.get<Plugin>(`/marketplace/plugins/${author}/${name}`);
+    async (author: string, name: string): Promise<PluginDetails> => {
+      const response = await api.get<PluginDetails>(`/marketplace/plugins/${author}/${name}`);
       return response.data;
     },
     {
@@ -207,9 +186,9 @@ export const marketplaceService = {
    * Get featured or recommended plugins
    */
   getFeaturedPlugins: withErrorHandling(
-    async (limit = 6): Promise<SearchResult> => {
+    async (limit = 6): Promise<PluginSearchResult> => {
       try {
-        const response = await api.get<SearchResult>('/marketplace/plugins/featured', { 
+        const response = await api.get<PluginSearchResult>('/marketplace/plugins/featured', {
           params: { limit } 
         });
         return response.data;
@@ -228,7 +207,8 @@ export const marketplaceService = {
         plugins: [],
         total: 0,
         page: 1,
-        per_page: 6
+        per_page: 6,
+        has_more: false,
       },
       rethrow: false
     }

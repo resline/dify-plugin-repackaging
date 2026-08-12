@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # Mock backend for E2E tests
   backend-mock:
-    image: node:20-alpine
+    image: node:24-alpine
     container_name: dify-plugin-backend-mock
     working_dir: /app
     command: |
@@ -22,7 +20,7 @@ services:
 
   # Frontend for testing
   frontend-test:
-    image: node:20-alpine
+    image: node:24-alpine
     container_name: dify-plugin-frontend-test
     working_dir: /app
     command: sh -c "npm install && npm run build && npm install -g serve && serve -s dist -l 80"
@@ -46,7 +44,7 @@ services:
 
   # Playwright test runner
   playwright-test:
-    image: mcr.microsoft.com/playwright:v1.40.0-focal
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
     container_name: dify-plugin-playwright-test
     working_dir: /app
     command: sh -c "npm install && npx playwright test --reporter=list"

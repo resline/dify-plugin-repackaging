@@ -1,533 +1,165 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '../../test/utils/test-utils'
-import userEvent from '@testing-library/user-event'
-import TaskStatus from '../TaskStatus'
-import { mockWebSocketMessage } from '../../test/utils/test-utils'
-import { server } from '../../test/mocks/server'
+import { act } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
-
-// Access the mock WebSocket class from global
-const MockWebSocket = global.WebSocket as any
+import { render, screen, waitFor } from '../../test/utils/test-utils'
+import { server } from '../../test/mocks/server'
+import { MockWebSocket } from '../../test/mocks/websocket'
+import TaskStatus from '../TaskStatus'
+import type { Task } from '../../types/app'
 
 describe('TaskStatus', () => {
-  const mockOnComplete = vi.fn()
-  const mockOnError = vi.fn()
-  const mockOnNewTask = vi.fn()
+  const taskId = 'test-task-123'
+  const onComplete = vi.fn()
+  const onError = vi.fn()
+  const onNewTask = vi.fn()
+  const onStatusChange = vi.fn()
 
-  const defaultProps = {
-    taskId: 'test-task-123',
-    onComplete: mockOnComplete,
-    onError: mockOnError,
-    onNewTask: mockOnNewTask
+  const props = { taskId, onComplete, onError, onNewTask, onStatusChange }
+
+  const task = (overrides: Partial<Task> = {}): Task => ({
+    task_id: taskId,
+    status: 'pending',
+    progress: 0,
+    created_at: '2024-01-01T10:00:00Z',
+    ...overrides,
+  })
+
+  const respondWith = (response: Task) => {
+    server.use(
+      http.get(`/api/v1/tasks/${taskId}`, () => HttpResponse.json(response))
+    )
+  }
+
+  const renderTask = async (initialTask = task()) => {
+    respondWith(initialTask)
+    const view = render(<TaskStatus {...props} />)
+    await waitFor(() => expect(onStatusChange).toHaveBeenCalledWith(initialTask))
+    return view
+  }
+
+  const openSocket = () => {
+    const transport = MockWebSocket.instances[0]
+    act(() => transport.serverOpen())
+    return transport
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('renders initial loading state', async () => {
-    // Mock the initial task status API response
-    const mockTask = {
-      id: 'test-task-123',
-      status: 'pending',
-      created_at: new Date().toISOString(),
-      logs: []
-    }
-    
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json(mockTask)
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Initial state shows a loading spinner
-    expect(screen.getByRole('status')).toBeInTheDocument()
-    
-    // Wait for task status to load
-    await waitFor(() => {
-      expect(screen.getByText(/waiting to start/i)).toBeInTheDocument()
-    })
+  it('loads the initial task and records its initial state', async () => {
+    respondWith(task())
+    render(<TaskStatus {...props} />)
+    expect(screen.getByRole('status', { name: /loading task status/i })).toBeInTheDocument()
+
+    expect(await screen.findByText(/waiting to start/i)).toBeInTheDocument()
+    expect(screen.getByText(/task test-task-123 started/i)).toBeInTheDocument()
+    expect(screen.getByText(/task id: test-task-123/i)).toBeInTheDocument()
   })
 
-  it('establishes WebSocket connection and receives messages', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Wait for the component to render and fetch initial status
-    await waitFor(() => {
-      expect(screen.getByText(/waiting to start/i)).toBeInTheDocument()
+  it('applies complete WebSocket snapshots and progress updates', async () => {
+    await renderTask(task({ status: 'processing' }))
+    const transport = openSocket()
+    const update = task({
+      status: 'processing',
+      progress: 50,
+      message: 'Installing dependencies...',
     })
-    
-    // The component should establish a WebSocket connection
-    // Check that the component can receive log messages
-    await waitFor(() => {
-      // Look for the initial log entry
-      expect(screen.getByText(/task test-task-123 started/i)).toBeInTheDocument()
-    })
+
+    act(() => transport.serverMessage({ type: 'status', ...update }))
+
+    expect(await screen.findByText('Installing dependencies...')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: /task progress/i })).toHaveAttribute('aria-valuenow', '50')
+    expect(onStatusChange).toHaveBeenLastCalledWith(expect.objectContaining(update))
   })
 
-  it('displays task progress messages', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'processing',
-          message: 'Starting repackaging process...',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Wait for initial render
-    await waitFor(() => {
-      expect(screen.getByText(/starting repackaging process/i)).toBeInTheDocument()
-    })
-    
-    // Get the WebSocket instance
-    const ws = (MockWebSocket as any).lastInstance
-    
-    // Simulate task progress
-    if (ws && ws.onmessage) {
-      act(() => {
-        mockWebSocketMessage(ws, {
-          status: 'downloading',
-          message: 'Downloading plugin package...',
-          type: 'status'
-        })
-      })
-    }
-    
-    await waitFor(() => {
-      expect(screen.getByText(/downloading plugin package/i)).toBeInTheDocument()
-    })
-    
-    if (ws && ws.onmessage) {
-      act(() => {
-        mockWebSocketMessage(ws, {
-          status: 'processing',
-          message: 'Installing dependencies...',
-          type: 'status'
-        })
-      })
-    }
-    
-    await waitFor(() => {
-      expect(screen.getByText(/installing dependencies/i)).toBeInTheDocument()
-    })
-  })
+  it('reports a failed task and preserves the failure message', async () => {
+    await renderTask(task({ status: 'processing' }))
+    const transport = openSocket()
 
-  it('displays error messages', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'processing',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Wait a bit for WebSocket to establish
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Get the mock WebSocket instance
-    const ws = (MockWebSocket as any).lastInstance
-    
-    if (ws && ws.onmessage) {
-      act(() => {
-        mockWebSocketMessage(ws, {
+    act(() => transport.serverMessage({
+      type: 'status',
+      ...task({
         status: 'failed',
         message: 'Failed to download package',
         error: 'Network error',
-        type: 'status'
-      })
-      })
-    }
-    
-    await waitFor(() => {
-      expect(screen.getByText(/failed to download package/i)).toBeInTheDocument()
-      expect(mockOnError).toHaveBeenCalledWith('Network error')
-    })
+      }),
+    }))
+
+    expect(await screen.findByText(/repackaging failed/i)).toBeInTheDocument()
+    expect(screen.getByText('Failed to download package')).toBeInTheDocument()
+    expect(onError).toHaveBeenCalledWith('Network error')
   })
 
-  it('handles task completion', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'processing',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Wait a bit for WebSocket to establish
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Get the mock WebSocket instance
-    const ws = (MockWebSocket as any).lastInstance
-    
-    const completedData = {
+  it('reports completion once and exposes download actions', async () => {
+    await renderTask(task({ status: 'processing' }))
+    const transport = openSocket()
+    const completed = task({
       status: 'completed',
+      progress: 100,
       message: 'Repackaging completed!',
       output_filename: 'plugin-offline.difypkg',
-      download_url: '/api/v1/tasks/test-task-123/download',
-      type: 'status'
-    }
-    
-    if (ws && ws.onmessage) {
-      act(() => {
-        mockWebSocketMessage(ws, completedData)
-      })
-    }
-
-    await waitFor(() => {
-      expect(mockOnComplete).toHaveBeenCalledWith(completedData)
+      download_url: `/api/v1/tasks/${taskId}/download`,
+      completed_at: '2024-01-01T10:05:00Z',
     })
-    
-    expect(screen.getByText(/repackaging completed/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /download/i })).toBeInTheDocument()
+
+    act(() => transport.serverMessage({ type: 'status', ...completed }))
+    act(() => transport.serverMessage({ type: 'status', ...completed }))
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce())
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining(completed))
+    expect(screen.getByRole('button', { name: 'Download Plugin' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /download plugin-offline\.difypkg/i })).toBeInTheDocument()
+    expect(screen.getByText(/completed:/i)).toBeInTheDocument()
   })
 
-  it('handles task failure', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'processing',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Wait a bit for WebSocket to establish
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Get the mock WebSocket instance
-    const ws = (MockWebSocket as any).lastInstance
-    
-    if (ws && ws.onmessage) {
-      act(() => {
-        mockWebSocketMessage(ws, {
-        status: 'failed',
-        message: 'Task failed: Invalid plugin format',
-        error: 'Invalid plugin format',
-        type: 'status'
-      })
-      })
-    }
-    
-    await waitFor(() => {
-      expect(screen.getByText(/repackaging failed/i)).toBeInTheDocument()
-      expect(mockOnError).toHaveBeenCalledWith('Invalid plugin format')
-    })
+  it('offers a REST refresh when an active connection drops', async () => {
+    await renderTask(task({ status: 'processing' }))
+    const transport = openSocket()
+
+    act(() => transport.serverClose(1006, 'Connection lost'))
+
+    expect(await screen.findByRole('button', { name: /refresh/i })).toBeInTheDocument()
+    expect(screen.getByText(/connection lost/i)).toBeInTheDocument()
   })
 
-  it('displays progress percentage', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'processing',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Wait a bit for WebSocket to establish
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Get the mock WebSocket instance
-    const ws = (MockWebSocket as any).lastInstance
-    
-    if (ws && ws.onmessage) {
-      act(() => {
-        mockWebSocketMessage(ws, {
-        status: 'processing',
-        progress: 50,
-        message: 'Processing dependencies...',
-        type: 'status'
-      })
-      })
-    }
-    
-    await waitFor(() => {
-      expect(screen.getByText(/50%/)).toBeInTheDocument()
-      expect(screen.getByText(/processing dependencies/i)).toBeInTheDocument()
-    })
-    
-    // Check the progress bar visual element
-    const progressBar = screen.getByText('50%').closest('.bg-gray-200')
-    expect(progressBar).toBeInTheDocument()
+  it('closes its socket during unmount', async () => {
+    const view = await renderTask(task({ status: 'processing' }))
+    const transport = MockWebSocket.instances[0]
+
+    view.unmount()
+
+    expect(transport.close).toHaveBeenCalledOnce()
   })
 
-  it('handles WebSocket disconnection', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'processing',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Wait a bit for WebSocket to establish
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Get the mock WebSocket instance
-    const ws = (MockWebSocket as any).lastInstance
-    
-    // Simulate connection close
-    if (ws) {
-      act(() => {
-        ws.close(1006, 'Connection lost')
-      })
-    }
-    
-    await waitFor(() => {
-      // Should show refresh button when disconnected
-      expect(screen.getByRole('button', { name: /refresh/i })).toBeInTheDocument()
-    })
+  it('renders plugin metadata and invokes the new-task action', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    await renderTask(task({
+      status: 'completed',
+      progress: 100,
+      plugin_metadata: {
+        name: 'agent',
+        author: 'langgenius',
+        version: '0.0.9',
+        description: 'Agent plugin',
+      },
+    }))
+
+    expect(screen.getByText('Plugin Information')).toBeInTheDocument()
+    expect(screen.getByText('langgenius')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /new task/i }))
+    expect(onNewTask).toHaveBeenCalledOnce()
   })
 
-  it('cleans up WebSocket on unmount', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'processing',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    const { unmount } = render(<TaskStatus {...defaultProps} />)
-    
-    // Wait a bit for WebSocket to establish
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Get the mock WebSocket instance
-    const ws = (MockWebSocket as any).lastInstance
-    
-    if (ws) {
-      const closeSpy = vi.spyOn(ws, 'close')
-      unmount()
-      expect(closeSpy).toHaveBeenCalled()
-    } else {
-      // If no WebSocket instance, just verify unmount works
-      unmount()
-    }
-  })
+  it('renders an accessible progress status and log viewer', async () => {
+    await renderTask(task({
+      status: 'processing',
+      progress: 25,
+      message: 'Downloading package',
+    }))
 
-  it('displays log viewer for detailed logs', async () => {
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'processing',
-          message: 'Step 1: Downloading',
-          created_at: new Date().toISOString(),
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    // Wait for initial message
-    await waitFor(() => {
-      expect(screen.getByText(/step 1: downloading/i)).toBeInTheDocument()
-    })
-    
-    const ws = (MockWebSocket as any).lastInstance
-    
-    // Add another log message
-    if (ws && ws.onmessage) {
-      act(() => {
-        mockWebSocketMessage(ws, {
-        status: 'processing',
-        message: 'Step 2: Extracting',
-        type: 'status'
-      })
-      })
-    }
-    
-    await waitFor(() => {
-      expect(screen.getByText(/step 2: extracting/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows task details and timestamps', async () => {
-    const createdAt = '2024-01-01T10:00:00Z'
-    const completedAt = '2024-01-01T10:05:00Z'
-    
-    // Mock the initial task status API response
-    server.use(
-      http.get('/api/v1/tasks/test-task-123', () => {
-        return HttpResponse.json({
-          id: 'test-task-123',
-          status: 'completed',
-          created_at: createdAt,
-          completed_at: completedAt,
-          logs: []
-        })
-      })
-    )
-    
-    render(<TaskStatus {...defaultProps} />)
-    
-    await waitFor(() => {
-      expect(screen.getByText(/task id: test-task-123/i)).toBeInTheDocument()
-      expect(screen.getByText(/started:/i)).toBeInTheDocument()
-      expect(screen.getByText(/completed:/i)).toBeInTheDocument()
-    })
-  })
-
-  describe('Accessibility', () => {
-    it('has proper ARIA attributes for progress', async () => {
-      // Mock the initial task status API response with progress
-      server.use(
-        http.get('/api/v1/tasks/test-task-123', () => {
-          return HttpResponse.json({
-            id: 'test-task-123',
-            status: 'processing',
-            progress: 50,
-            created_at: new Date().toISOString(),
-            logs: []
-          })
-        })
-      )
-      
-      render(<TaskStatus {...defaultProps} />)
-      
-      await waitFor(() => {
-        // Check for progress percentage text instead of progressbar role
-        expect(screen.getByText('50%')).toBeInTheDocument()
-      })
-    })
-
-    it('announces status changes to screen readers', async () => {
-      // Mock the initial task status API response
-      server.use(
-        http.get('/api/v1/tasks/test-task-123', () => {
-          return HttpResponse.json({
-            id: 'test-task-123',
-            status: 'processing',
-            created_at: new Date().toISOString(),
-            logs: []
-          })
-        })
-      )
-      
-      render(<TaskStatus {...defaultProps} />)
-      
-      await waitFor(() => {
-        expect(global.WebSocket).toHaveBeenCalled()
-      })
-      
-      const ws = (MockWebSocket as any).lastInstance
-      
-      if (ws && ws.onmessage) {
-        act(() => {
-          mockWebSocketMessage(ws, {
-            status: 'processing',
-            message: 'Important status update',
-            type: 'status'
-          })
-        })
-      }
-
-      // Status messages should be visible
-      await waitFor(() => {
-        expect(screen.getByText(/important status update/i)).toBeInTheDocument()
-      })
-    })
-
-    it('provides keyboard navigation for logs', async () => {
-      // Mock the initial task status API response
-      server.use(
-        http.get('/api/v1/tasks/test-task-123', () => {
-          return HttpResponse.json({
-            id: 'test-task-123',
-            status: 'processing',
-            message: 'Log message 0',
-            created_at: new Date().toISOString(),
-            logs: []
-          })
-        })
-      )
-      
-      const user = userEvent.setup()
-      render(<TaskStatus {...defaultProps} />)
-      
-      await waitFor(() => {
-        expect(global.WebSocket).toHaveBeenCalled()
-      })
-      
-      const ws = (MockWebSocket as any).lastInstance
-      
-      // Add more logs
-      if (ws && ws.onmessage) {
-        act(() => {
-          for (let i = 1; i < 5; i++) {
-            mockWebSocketMessage(ws, {
-              status: 'processing',
-              message: `Log message ${i}`,
-              type: 'status'
-            })
-          }
-        })
-      }
-
-      await waitFor(() => {
-        expect(screen.getByText(/log message 4/i)).toBeInTheDocument()
-      })
-      
-      // Check that all log messages are present
-      for (let i = 0; i < 5; i++) {
-        expect(screen.getByText(`Log message ${i}`)).toBeInTheDocument()
-      }
-    })
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemin', '0')
+    expect(screen.getByText('Downloading package')).toBeInTheDocument()
   })
 })

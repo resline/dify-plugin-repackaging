@@ -17,6 +17,10 @@ from app.api.v1.endpoints.files import (
 )
 from app.services.file_manager import FileManager
 
+FILE_ID_A = "11111111-1111-4111-8111-111111111111"
+FILE_ID_B = "22222222-2222-4222-8222-222222222222"
+FILE_ID_C = "33333333-3333-4333-8333-333333333333"
+
 
 class TestListFilesEndpoint:
     """Test list_files endpoint with comprehensive coverage."""
@@ -113,7 +117,7 @@ class TestDownloadFileEndpoint:
     async def test_download_file_success(self, async_client: AsyncClient, temp_directory):
         """Test successful file download."""
         # Arrange
-        file_id = "test-123"
+        file_id = FILE_ID_A
         file_content = b"Test plugin content"
         file_path = os.path.join(temp_directory, "test.difypkg")
         
@@ -135,7 +139,7 @@ class TestDownloadFileEndpoint:
     async def test_download_file_not_found(self, async_client: AsyncClient):
         """Test downloading non-existent file."""
         # Arrange
-        file_id = "nonexistent"
+        file_id = FILE_ID_B
         
         with patch.object(FileManager, 'get_file_path', return_value=None):
             # Act
@@ -149,7 +153,7 @@ class TestDownloadFileEndpoint:
     async def test_download_file_no_filename(self, async_client: AsyncClient, temp_directory):
         """Test download when file info is missing."""
         # Arrange
-        file_id = "test-456"
+        file_id = FILE_ID_B
         file_path = os.path.join(temp_directory, "test.difypkg")
         
         with open(file_path, "wb") as f:
@@ -169,7 +173,7 @@ class TestDownloadFileEndpoint:
     async def test_download_file_exception(self, async_client: AsyncClient):
         """Test handling exceptions during download."""
         # Arrange
-        file_id = "error-test"
+        file_id = FILE_ID_C
         
         with patch.object(FileManager, 'get_file_path', side_effect=Exception("Storage error")):
             # Act
@@ -187,7 +191,7 @@ class TestGetFileInfoEndpoint:
     async def test_get_file_info_success(self, async_client: AsyncClient):
         """Test getting file info successfully."""
         # Arrange
-        file_id = "info-123"
+        file_id = FILE_ID_A
         file_info = {
             "file_id": file_id,
             "filename": "plugin-offline.difypkg",
@@ -219,7 +223,7 @@ class TestGetFileInfoEndpoint:
     async def test_get_file_info_not_found(self, async_client: AsyncClient):
         """Test getting info for non-existent file."""
         # Arrange
-        file_id = "nonexistent"
+        file_id = FILE_ID_B
         
         with patch.object(FileManager, 'get_file_info', return_value=None):
             # Act
@@ -233,7 +237,7 @@ class TestGetFileInfoEndpoint:
     async def test_get_file_info_exception(self, async_client: AsyncClient):
         """Test handling exceptions in get_file_info."""
         # Arrange
-        file_id = "error-test"
+        file_id = FILE_ID_C
         
         with patch.object(FileManager, 'get_file_info', side_effect=Exception("Database error")):
             # Act
@@ -314,7 +318,7 @@ class TestDeleteFileEndpoint:
     async def test_delete_file_success(self, async_client: AsyncClient):
         """Test successful file deletion."""
         # Arrange
-        file_id = "delete-123"
+        file_id = FILE_ID_A
         file_info = {
             "file_id": file_id,
             "filename": "plugin-offline.difypkg"
@@ -335,7 +339,7 @@ class TestDeleteFileEndpoint:
     async def test_delete_file_not_found(self, async_client: AsyncClient):
         """Test deleting non-existent file."""
         # Arrange
-        file_id = "nonexistent"
+        file_id = FILE_ID_B
         
         with patch.object(FileManager, 'get_file_info', return_value=None):
             # Act
@@ -349,7 +353,7 @@ class TestDeleteFileEndpoint:
     async def test_delete_file_failed(self, async_client: AsyncClient):
         """Test when file deletion fails."""
         # Arrange
-        file_id = "fail-delete"
+        file_id = FILE_ID_B
         file_info = {"file_id": file_id}
         
         with patch.object(FileManager, 'get_file_info', return_value=file_info):
@@ -365,7 +369,7 @@ class TestDeleteFileEndpoint:
     async def test_delete_file_exception(self, async_client: AsyncClient):
         """Test handling exceptions during deletion."""
         # Arrange
-        file_id = "error-delete"
+        file_id = FILE_ID_C
         
         with patch.object(FileManager, 'get_file_info', side_effect=Exception("Permission denied")):
             # Act
@@ -476,15 +480,15 @@ class TestFileManagerIntegration:
     async def test_concurrent_file_operations(self, async_client: AsyncClient):
         """Test handling concurrent file operations."""
         # Arrange
-        file_ids = ["file1", "file2", "file3"]
+        file_ids = [FILE_ID_A, FILE_ID_B, FILE_ID_C]
         
         # Mock FileManager to simulate concurrent access
         with patch.object(FileManager, 'get_file_info') as mock_get_info:
             # Simulate different states for concurrent requests
             mock_get_info.side_effect = [
-                {"file_id": "file1", "filename": "file1.difypkg"},
+                {"file_id": FILE_ID_A, "filename": "file1.difypkg"},
                 None,  # file2 doesn't exist
-                {"file_id": "file3", "filename": "file3.difypkg"}
+                {"file_id": FILE_ID_C, "filename": "file3.difypkg"}
             ]
             
             # Act - Make concurrent-like requests

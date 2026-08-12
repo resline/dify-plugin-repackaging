@@ -743,7 +743,7 @@ async def download_result(task_id: str):
                 logger.info(f"TEMP_DIR contents: {os.listdir(settings.TEMP_DIR)}")
             else:
                 logger.error(f"TEMP_DIR does not exist: {settings.TEMP_DIR}")
-            raise HTTPException(status_code=500, detail="Task directory not found")
+            raise HTTPException(status_code=404, detail="File not found on server")
         
         # List directory contents
         logger.info(f"Task directory contents: {os.listdir(parent_dir)}")

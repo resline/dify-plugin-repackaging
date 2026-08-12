@@ -21,8 +21,8 @@ describe('MarketplaceBrowser', () => {
   it('renders loading state initially', () => {
     render(<MarketplaceBrowser {...defaultProps} />)
     
-    // Should show loading spinner
-    expect(screen.getByText(/loading plugins/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('status', { name: 'Loading' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /search marketplace/i })).toBeDisabled()
   })
 
   it('renders plugins after loading', async () => {
@@ -121,7 +121,7 @@ describe('MarketplaceBrowser', () => {
   it('handles error state', async () => {
     server.use(
       http.get('/api/v1/marketplace/plugins', () => {
-        return HttpResponse.json({ error: 'Server error' }, { status: 500 })
+        return HttpResponse.json({ error: 'Bad request' }, { status: 400 })
       }),
       http.get('/api/v1/marketplace/categories', () => {
         return HttpResponse.json({ categories: [] })
@@ -134,10 +134,7 @@ describe('MarketplaceBrowser', () => {
     render(<MarketplaceBrowser {...defaultProps} />)
     
     await waitFor(() => {
-      const errorMessage = screen.getByText((content, element) => {
-        return element?.classList?.contains('text-red-700') && 
-               content?.toLowerCase()?.includes('marketplace') || false
-      })
+      const errorMessage = screen.getByText(/request failed|bad request|failed to search/i)
       expect(errorMessage).toBeInTheDocument()
     }, { timeout: 2000 })
   })
@@ -212,8 +209,7 @@ describe('MarketplaceBrowser', () => {
   it('displays loading state while fetching', () => {
     render(<MarketplaceBrowser {...defaultProps} />)
     
-    // Should show loading spinner and text
-    expect(screen.getByText(/loading plugins/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('status', { name: 'Loading' }).length).toBeGreaterThan(0)
   })
 
   describe('Accessibility', () => {

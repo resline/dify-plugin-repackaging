@@ -4,12 +4,20 @@ import { Lock } from 'lucide-react';
 
 export const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, authError } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.trim()) {
-      login(password);
+      setIsSubmitting(true);
+      try {
+        await login(password);
+      } catch {
+        // AuthContext exposes the server-safe error message.
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -47,6 +55,7 @@ export const LoginForm: React.FC = () => {
                 placeholder="Enter password"
                 autoFocus
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -60,9 +69,10 @@ export const LoginForm: React.FC = () => {
 
             <button
               type="submit"
+              disabled={isSubmitting}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              Sign In
+              {isSubmitting ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
 

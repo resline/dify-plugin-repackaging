@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useToast } from '../components/Toast';
 
 interface UseCopyToClipboardReturn {
@@ -9,17 +9,24 @@ interface UseCopyToClipboardReturn {
 export const useCopyToClipboard = (): UseCopyToClipboardReturn => {
   const [isCopying, setIsCopying] = useState(false);
   const { copy: showCopyToast, error } = useToast();
+  const isCopyingRef = useRef(false);
+  const showCopyToastRef = useRef(showCopyToast);
+  const showErrorRef = useRef(error);
+
+  showCopyToastRef.current = showCopyToast;
+  showErrorRef.current = error;
 
   const copy = useCallback(async (text: string, successMessage?: string) => {
-    if (isCopying) return;
+    if (isCopyingRef.current) return;
 
+    isCopyingRef.current = true;
     setIsCopying(true);
     
     try {
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
-        showCopyToast(successMessage || 'Copied to clipboard!');
+        showCopyToastRef.current(successMessage || 'Copied to clipboard!');
       } else {
         // Fallback for older browsers or non-secure contexts
         const textArea = document.createElement('textarea');
@@ -33,9 +40,9 @@ export const useCopyToClipboard = (): UseCopyToClipboardReturn => {
         
         try {
           document.execCommand('copy');
-          showCopyToast(successMessage || 'Copied to clipboard!');
+          showCopyToastRef.current(successMessage || 'Copied to clipboard!');
         } catch (err) {
-          error('Failed to copy to clipboard');
+          showErrorRef.current('Failed to copy to clipboard');
           throw err;
         } finally {
           document.body.removeChild(textArea);
@@ -43,11 +50,12 @@ export const useCopyToClipboard = (): UseCopyToClipboardReturn => {
       }
     } catch (err) {
       console.error('Failed to copy:', err);
-      error('Failed to copy to clipboard');
+      showErrorRef.current('Failed to copy to clipboard');
     } finally {
+      isCopyingRef.current = false;
       setIsCopying(false);
     }
-  }, [isCopying, showCopyToast, error]);
+  }, []);
 
   return { copy, isCopying };
 };

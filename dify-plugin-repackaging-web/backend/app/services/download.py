@@ -3,7 +3,7 @@ import os
 from urllib.parse import urlparse
 from typing import Tuple, Optional
 from app.core.config import settings
-from app.utils.http_client import get_async_client, get_default_timeout
+from app.utils.http_client import get_async_client
 import aiofiles
 import asyncio
 import logging
@@ -16,13 +16,19 @@ class DownloadService:
     def validate_url(url: str) -> bool:
         """Validate if URL is from allowed domains"""
         parsed = urlparse(url)
-        domain = parsed.netloc.lower()
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return False
+
+        domain = parsed.hostname.lower()
         
         # Remove www. prefix if present
         if domain.startswith("www."):
             domain = domain[4:]
         
-        return any(domain.endswith(allowed) for allowed in settings.ALLOWED_DOWNLOAD_DOMAINS)
+        return any(
+            domain == allowed or domain.endswith(f".{allowed}")
+            for allowed in settings.ALLOWED_DOWNLOAD_DOMAINS
+        )
     
     @staticmethod
     async def check_file_size(url: str) -> Optional[int]:

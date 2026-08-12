@@ -19,14 +19,14 @@ describe('Marketplace Service', () => {
     })
 
     it('searches plugins with query', async () => {
-      const result = await marketplaceService.searchPlugins('visual')
+      const result = await marketplaceService.searchPlugins({ q: 'visual' })
       
       expect(result.plugins).toHaveLength(1)
       expect(result.plugins[0].name).toBe('visualization')
     })
 
     it('returns empty results for no matches', async () => {
-      const result = await marketplaceService.searchPlugins('nonexistent')
+      const result = await marketplaceService.searchPlugins({ q: 'nonexistent' })
       
       expect(result.plugins).toHaveLength(0)
       expect(result.total).toBe(0)
@@ -43,18 +43,18 @@ describe('Marketplace Service', () => {
     })
 
     it('sends correct query parameters', async () => {
-      let capturedUrl: URL | null = null
+      let capturedUrl = ''
       
       server.use(
         http.get('/api/v1/marketplace/plugins', ({ request }) => {
-          capturedUrl = new URL(request.url)
+          capturedUrl = request.url
           return HttpResponse.json({ plugins: [], total: 0 })
         })
       )
 
-      await marketplaceService.searchPlugins('test query')
+      await marketplaceService.searchPlugins({ q: 'test query' })
       
-      expect(capturedUrl?.searchParams.get('search')).toBe('test query')
+      expect(new URL(capturedUrl).searchParams.get('q')).toBe('test query')
     })
   })
 
@@ -120,20 +120,6 @@ describe('Marketplace Service', () => {
       await expect(marketplaceService.searchPlugins()).rejects.toThrow()
     })
 
-    it('handles timeout errors', async () => {
-      // This would require implementing timeout in the actual service
-      // For now, we'll just test that errors are propagated
-      server.use(
-        http.get('/api/v1/marketplace/plugins', async () => {
-          await new Promise(resolve => setTimeout(resolve, 10000))
-          return HttpResponse.json({ plugins: [], total: 0 })
-        })
-      )
-
-      // With a proper timeout implementation, this would timeout
-      // For now, it will just hang unless we implement timeout in the service
-    })
-
     it('handles malformed responses', async () => {
       server.use(
         http.get('/api/v1/marketplace/plugins', () => {
@@ -156,8 +142,8 @@ describe('Marketplace Service', () => {
         })
       )
 
-      await marketplaceService.searchPlugins('test')
-      await marketplaceService.searchPlugins('test')
+      await marketplaceService.searchPlugins({ q: 'test' })
+      await marketplaceService.searchPlugins({ q: 'test' })
       
       expect(callCount).toBe(2)
     })
@@ -168,13 +154,13 @@ describe('Marketplace Service', () => {
       server.use(
         http.get('/api/v1/marketplace/plugins', ({ request }) => {
           const url = new URL(request.url)
-          queries.push(url.searchParams.get('search') || '')
+          queries.push(url.searchParams.get('q') || '')
           return HttpResponse.json({ plugins: [], total: 0 })
         })
       )
 
-      await marketplaceService.searchPlugins('query1')
-      await marketplaceService.searchPlugins('query2')
+      await marketplaceService.searchPlugins({ q: 'query1' })
+      await marketplaceService.searchPlugins({ q: 'query2' })
       
       expect(queries).toEqual(['query1', 'query2'])
     })

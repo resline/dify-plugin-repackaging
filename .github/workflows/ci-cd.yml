@@ -21,7 +21,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.12'
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
 
@@ -45,21 +45,26 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Cache pre-commit
-        uses: actions/cache@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            pre-commit-${{ runner.os }}-
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: dify-plugin-repackaging-web/frontend/package-lock.json
 
-      - name: Install pre-commit
+      - name: Install frontend dependencies
+        working-directory: ./dify-plugin-repackaging-web/frontend
+        run: npm ci
+
+      - name: Validate backend syntax
+        working-directory: ./dify-plugin-repackaging-web/backend
+        run: python -m compileall -q app
+
+      - name: Validate frontend source
+        working-directory: ./dify-plugin-repackaging-web/frontend
         run: |
-          pip install pre-commit
-          pre-commit install
-
-      - name: Run pre-commit checks
-        run: pre-commit run --all-files
+          npm run lint
+          npm run type-check
 
   # Job: Shell Script Analysis
   shellcheck:
@@ -156,7 +161,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['18', '20']
+        node-version: ['22', '24']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -224,7 +229,7 @@ jobs:
 
       - name: Build test images
         run: |
-          docker-compose -f docker-compose.test.yml build --parallel
+          docker compose -f docker-compose.test.yml build --parallel
 
       - name: Run integration tests
         run: |
@@ -257,7 +262,7 @@ jobs:
       - name: Clean up
         if: always()
         run: |
-          docker-compose -f docker-compose.test.yml -p dify-repack-test down -v
+          docker compose -f docker-compose.test.yml -p dify-repack-test down -v
 
   # Job: E2E Tests
   e2e-tests:
@@ -286,11 +291,6 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps ${{ matrix.browser }}
-
-      - name: Start services with Docker Compose
-        run: |
-          docker-compose -f docker-compose.yml up -d
-          ./scripts/wait-for-services.sh
 
       - name: Run E2E tests
         working-directory: ./dify-plugin-repackaging-web/frontend
@@ -390,8 +390,8 @@ jobs:
 
       - name: Start services
         run: |
-          docker-compose -f docker-compose.yml up -d
-          ./scripts/wait-for-services.sh
+          docker compose -f dify-plugin-repackaging-web/docker-compose.yml up -d
+          COMPOSE_FILE_PATH=dify-plugin-repackaging-web/docker-compose.yml ./scripts/wait-for-services.sh
 
       - name: Run performance tests
         run: |

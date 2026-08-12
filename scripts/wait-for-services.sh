@@ -6,6 +6,7 @@ set -e
 # Configuration
 MAX_RETRIES=30
 RETRY_INTERVAL=5
+COMPOSE_FILE_PATH=${COMPOSE_FILE_PATH:-dify-plugin-repackaging-web/docker-compose.yml}
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -48,15 +49,15 @@ wait_for_service() {
 }
 
 # Wait for Redis
-wait_for_service "Redis" "docker-compose exec -T redis redis-cli ping | grep -q PONG"
+wait_for_service "Redis" "docker compose -f '$COMPOSE_FILE_PATH' exec -T redis redis-cli ping | grep -q PONG"
 
 # Wait for Backend API
 wait_for_service "Backend API" "curl -f http://localhost:8000/health"
 
 # Wait for Frontend
-wait_for_service "Frontend" "curl -f http://localhost:3000"
+wait_for_service "Frontend" "curl -f http://localhost:80"
 
 # Wait for Celery Worker
-wait_for_service "Celery Worker" "docker-compose exec -T worker celery -A app.workers.celery_app inspect ping"
+wait_for_service "Celery Worker" "docker compose -f '$COMPOSE_FILE_PATH' exec -T celery_worker celery -A app.workers.celery_app inspect ping"
 
 log_info "All services are ready!"

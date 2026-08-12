@@ -1,9 +1,14 @@
-import { createAxiosWithRetry, withRetry } from './utils/retry';
+import { createAxiosWithRetry } from './utils/retry';
 import { withErrorHandling, toApiError, logError } from './utils/errorHandler';
+import type { AxiosError } from 'axios';
+import type { CompletedTask, Task, TaskListResponse, TaskStartResponse } from '../types/app';
 
 const API_BASE_URL = '/api/v1';
 
-const getDownloadFilename = (contentDisposition, fallbackFilename) => {
+const getDownloadFilename = (
+  contentDisposition: string | undefined,
+  fallbackFilename?: string
+): string => {
   const encodedMatch = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i);
   const plainMatch = contentDisposition?.match(/filename="?([^";]+)"?/i);
   const headerFilename = encodedMatch?.[1]
@@ -15,7 +20,7 @@ const getDownloadFilename = (contentDisposition, fallbackFilename) => {
   return filename.split(/[\\/]/).pop() || 'plugin-offline.difypkg';
 };
 
-const saveBlob = (blob, filename) => {
+const saveBlob = (blob: Blob, filename: string): void => {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = objectUrl;
@@ -42,14 +47,14 @@ const api = createAxiosWithRetry(
     maxRetries: 3,
     initialDelay: 1000,
     maxDelay: 10000,
-    retryCondition: (error) => {
+    retryCondition: (error: AxiosError) => {
       // Don't retry client errors (4xx) except for 408 (timeout) and 429 (rate limit)
       if (error.response) {
         const status = error.response.status;
 
         // Special handling for 429: don't retry if it's an authentication failure
         if (status === 429) {
-          const detail = error.response.data?.detail || '';
+          const detail = (error.response.data as { detail?: string } | undefined)?.detail || '';
           // Don't retry authentication-related rate limits
           if (typeof detail === 'string' && detail.toLowerCase().includes('authentication')) {
             return false;
@@ -78,66 +83,53 @@ api.interceptors.response.use(
 
 export const taskService = {
   createTask: withErrorHandling(
-    async (url, platform = '', suffix = 'offline') => {
-      try {
-        const response = await api.post('/tasks', {
-          url,
-          platform,
-          suffix,
-        });
-        return response.data;
-      } catch (error) {
-        // Re-throw to allow UI to handle task creation errors
-        throw error;
-      }
+    async (url: string, platform = '', suffix = 'offline'): Promise<TaskStartResponse> => {
+      const response = await api.post<TaskStartResponse>('/tasks', {
+        url,
+        platform,
+        suffix,
+      });
+      return response.data;
     },
     { context: 'createTask', rethrow: true }
   ),
 
   createMarketplaceTask: withErrorHandling(
-    async (author, name, version, platform = '', suffix = 'offline') => {
-      try {
-        const response = await api.post('/tasks/marketplace', {
-          author,
-          name,
-          version,
-          platform,
-          suffix,
-        });
-        return response.data;
-      } catch (error) {
-        // Re-throw to allow UI to handle task creation errors
-        throw error;
-      }
+    async (
+      author: string,
+      name: string,
+      version?: string,
+      platform = '',
+      suffix = 'offline'
+    ): Promise<TaskStartResponse> => {
+      const response = await api.post<TaskStartResponse>('/tasks/marketplace', {
+        author,
+        name,
+        version,
+        platform,
+        suffix,
+      });
+      return response.data;
     },
     { context: 'createMarketplaceTask', rethrow: true }
   ),
 
   uploadFile: withErrorHandling(
-    async (file, platform = '', suffix = 'offline') => {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('platform', platform);
-        formData.append('suffix', suffix);
-        
-        const response = await api.post('/tasks/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        return response.data;
-      } catch (error) {
-        // Re-throw to allow UI to handle upload errors
-        throw error;
-      }
+    async (file: File, platform = '', suffix = 'offline'): Promise<TaskStartResponse> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('platform', platform);
+      formData.append('suffix', suffix);
+
+      const response = await api.post<TaskStartResponse>('/tasks/upload', formData);
+      return response.data;
     },
     { context: 'uploadFile', rethrow: true }
   ),
 
   getTaskStatus: withErrorHandling(
-    async (taskId) => {
-      const response = await api.get(`/tasks/${taskId}`);
+    async (taskId: string): Promise<Task | null> => {
+      const response = await api.get<Task>(`/tasks/${taskId}`);
       return response.data;
     },
     { 
@@ -147,11 +139,11 @@ export const taskService = {
     }
   ),
 
-  downloadFile: (taskId) => {
+  downloadFile: (taskId: string): string => {
     return `${API_BASE_URL}/tasks/${taskId}/download`;
   },
 
-  downloadTaskFile: async (taskId, fallbackFilename) => {
+  downloadTaskFile: async (taskId: string, fallbackFilename?: string): Promise<string> => {
     const response = await api.get(`/tasks/${taskId}/download`, {
       responseType: 'blob',
     });
@@ -168,8 +160,8 @@ export const taskService = {
   },
 
   listRecentTasks: withErrorHandling(
-    async (limit = 10) => {
-      const response = await api.get('/tasks', { params: { limit } });
+    async (limit = 10): Promise<TaskListResponse> => {
+      const response = await api.get<TaskListResponse>('/tasks', { params: { limit } });
       return response.data;
     },
     { 
@@ -180,13 +172,13 @@ export const taskService = {
   ),
 
   listCompletedFiles: withErrorHandling(
-    async (limit = 10) => {
-      const response = await api.get('/tasks/completed', { params: { limit } });
+    async (limit = 10): Promise<{ tasks: CompletedTask[]; total: number }> => {
+      const response = await api.get<{ tasks: CompletedTask[]; total: number }>('/tasks/completed', { params: { limit } });
       return response.data;
     },
     { 
       context: 'listCompletedFiles',
-      defaultValue: { files: [], total: 0 }, // Return empty array on error
+      defaultValue: { tasks: [], total: 0 }, // Return empty array on error
       rethrow: false
     }
   ),
@@ -198,7 +190,7 @@ export { marketplaceService } from './marketplace';
 // Import fileService from files.ts
 export { fileService } from './files';
 
-export const createWebSocket = (taskId) => {
+export const createWebSocket = (taskId: string): WebSocket => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
   return new WebSocket(`${protocol}//${host}/ws/tasks/${taskId}`);

@@ -14,7 +14,7 @@ describe('App authentication boundary', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Authentication Required' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Authentication Required' })).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Password'), 'test-password');
     await user.click(screen.getByRole('button', { name: 'Sign In' }));

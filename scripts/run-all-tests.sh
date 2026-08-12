@@ -245,7 +245,7 @@ if [ "$RUN_E2E" = true ]; then
     if ! curl -f http://localhost:8000/health > /dev/null 2>&1; then
         log_info "Starting services for E2E tests..."
         cd "$PROJECT_ROOT"
-        docker-compose up -d
+        docker compose up -d
         ./scripts/wait-for-services.sh
     fi
     
@@ -314,7 +314,7 @@ if [ "$RUN_PERFORMANCE" = true ]; then
     if ! curl -f http://localhost:8000/health > /dev/null 2>&1; then
         log_info "Starting services for performance tests..."
         cd "$PROJECT_ROOT"
-        docker-compose up -d
+        docker compose up -d
         ./scripts/wait-for-services.sh
     fi
     

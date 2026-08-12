@@ -1,17 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { Search, Filter, AlertCircle, RefreshCw } from 'lucide-react';
 import { marketplaceService } from '../services/marketplace';
 import PluginCard from './PluginCard';
 import { CardSkeleton } from './LoadingSkeleton';
-
-interface Plugin {
-  author: string;
-  name: string;
-  description?: string;
-  latest_version: string;
-  category?: string;
-  icon_url?: string;
-}
+import type { Plugin } from '../types/marketplace';
 
 interface MarketplaceBrowserProps {
   onSelectPlugin: (pluginData: {
@@ -32,7 +24,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
   suffix = 'offline' 
 }) => {
   const [plugins, setPlugins] = useState<Plugin[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedAuthor, setSelectedAuthor] = useState('');
@@ -178,6 +170,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
             <Search className="h-5 w-5 text-gray-500" />
           </div>
           <input
+            aria-label="Search marketplace plugins"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -187,6 +180,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
         </div>
         <button
           type="submit"
+          aria-label="Search marketplace"
           disabled={loading}
           className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
@@ -194,6 +188,7 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
         </button>
         <button
           type="button"
+          aria-label={showFilters ? 'Hide marketplace filters' : 'Show marketplace filters'}
           onClick={() => setShowFilters(!showFilters)}
           className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
         >
@@ -277,7 +272,11 @@ const MarketplaceBrowser: React.FC<MarketplaceBrowserProps> = ({
 
       {/* Plugin grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          aria-live="polite"
+          aria-label={`${plugins.length} marketplace plugins found`}
+        >
           <CardSkeleton count={6} />
         </div>
       ) : !error && plugins.length === 0 ? (

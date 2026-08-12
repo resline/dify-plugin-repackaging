@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Minimize2, Maximize2, X } from 'lucide-react';
 import TaskStatus from './TaskStatus';
 import useAppStore from '../stores/appStore';
+import type { Task } from '../types/app';
 
 interface ProcessingPanelProps {
   taskId: string;
-  onComplete: (task: any) => void;
+  onComplete: (task: Task) => void;
   onError: (error: string) => void;
   onClose: () => void;
 }
@@ -18,7 +19,7 @@ const ProcessingPanel: React.FC<ProcessingPanelProps> = ({
 }) => {
   const { isProcessingPanelMinimized, toggleProcessingPanel } = useAppStore();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const [taskSnapshot, setTaskSnapshot] = useState<any>(null);
+  const [taskSnapshot, setTaskSnapshot] = useState<Task | null>(null);
 
   useEffect(() => {
     setTaskSnapshot(null);

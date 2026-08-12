@@ -10,11 +10,14 @@ from fastapi import Request, HTTPException, status
 from app.core.config import settings
 import base64
 import hashlib
+import hmac
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+SESSION_COOKIE_NAME = "dify_repack_session"
+SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 
 
 class RateLimiter:
@@ -102,6 +105,38 @@ def verify_password(provided_password: str) -> bool:
     return constant_time_compare(provided_password, settings.AUTH_PASSWORD)
 
 
+def create_session_token(max_age: int = SESSION_MAX_AGE_SECONDS) -> str:
+    """Create a signed, stateless session token without exposing the password."""
+    expires_at = int(time.time()) + max_age
+    payload = str(expires_at)
+    signature = hmac.new(
+        (settings.AUTH_PASSWORD or "authentication-disabled").encode("utf-8"),
+        f"session:{payload}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{payload}.{signature}"
+
+
+def verify_session_token(token: Optional[str]) -> bool:
+    if not settings.AUTH_PASSWORD:
+        return True
+    if not token:
+        return False
+    try:
+        expires_raw, provided_signature = token.split(".", 1)
+        if int(expires_raw) < int(time.time()):
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    expected_signature = hmac.new(
+        settings.AUTH_PASSWORD.encode("utf-8"),
+        f"session:{expires_raw}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return secrets.compare_digest(provided_signature, expected_signature)
+
+
 def get_client_identifier(request: Request) -> str:
     """
     Get a unique identifier for the client for rate limiting.
@@ -130,6 +165,10 @@ async def verify_authentication(request: Request) -> bool:
         return True
 
     client_id = get_client_identifier(request)
+
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if verify_session_token(session_token):
+        return True
 
     # Method 1: Check X-Auth-Token header
     auth_token = request.headers.get("X-Auth-Token")
@@ -190,7 +229,7 @@ async def verify_authentication(request: Request) -> bool:
     logger.warning(f"No authentication provided from {client_id}")
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required. Provide X-Auth-Token header or HTTP Basic Auth."
+        detail="Authentication required. Sign in or provide HTTP Basic Auth."
     )
 
 
@@ -203,7 +242,11 @@ def is_public_endpoint(path: str) -> bool:
         "/health",
         "/docs",
         "/openapi.json",
-        "/redoc"
+        "/redoc",
+        f"{settings.API_V1_STR}/openapi.json",
+        f"{settings.API_V1_STR}/auth/login",
+        f"{settings.API_V1_STR}/auth/session",
+        f"{settings.API_V1_STR}/auth/logout",
     ]
 
     # Check exact matches

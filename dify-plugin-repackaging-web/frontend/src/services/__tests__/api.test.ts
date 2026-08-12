@@ -26,7 +26,7 @@ describe('API Service', () => {
         try {
           // Send request with empty URL which should fail validation
           await taskService.createTask('')
-        } catch (error: any) {
+        } catch (_error: any) {
           // Since our mock doesn't validate URLs, let's just verify the function works
           // In a real scenario, the server would return a 400 error
         }
@@ -82,19 +82,13 @@ describe('API Service', () => {
         // Wait a bit for the mock to update task status
         await waitFor(async () => {
           const status = await taskService.getTaskStatus(task_id)
-          expect(status.id).toBe(task_id)
-          expect(status.status).toBeDefined()
+          expect(status?.task_id).toBe(task_id)
+          expect(status?.status).toBeDefined()
         })
       })
 
-      it('handles non-existent task', async () => {
-        try {
-          await taskService.getTaskStatus('non-existent-task')
-          expect.fail('Should have thrown an error')
-        } catch (error: any) {
-          expect(error.response.status).toBe(404)
-          expect(error.response.data.error).toBe('Task not found')
-        }
+      it('returns null for a non-existent task', async () => {
+        await expect(taskService.getTaskStatus('non-existent-task')).resolves.toBeNull()
       })
     })
 
@@ -158,32 +152,4 @@ describe('API Service', () => {
     })
   })
 
-  describe('Error Handling', () => {
-    it('logs 404 errors appropriately', async () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      
-      try {
-        await taskService.getTaskStatus('non-existent-task')
-      } catch (error) {
-        // Expected to fail
-      }
-      
-      await waitFor(() => {
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('API endpoint not found')
-        )
-      })
-      
-      consoleWarnSpy.mockRestore()
-    })
-
-    it('logs server errors appropriately', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      
-      // We'd need to mock a 500 error response here
-      // This would require updating our mock handlers
-      
-      consoleErrorSpy.mockRestore()
-    })
-  })
 })

@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from './components/Layout';
 import UploadForm from './components/UploadForm';
-import TaskStatus from './components/TaskStatus';
 import CompletedFiles from './components/CompletedFiles';
 import MarketplaceBrowser from './components/MarketplaceBrowser';
 import Sidebar from './components/Sidebar';
@@ -14,11 +13,12 @@ import { ToastContainer, useToast } from './components/Toast';
 import useDeepLink from './hooks/useDeepLink';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import useAppStore from './stores/appStore';
+import type { MarketplaceSelection, RepackageFormData, TabId, Task } from './types/app';
 
 function AuthenticatedApp() {
   const { toasts, success, error, removeToast } = useToast();
   const deepLinkData = useDeepLink();
-  const processedDeepLinksRef = useRef(new Set());
+  const processedDeepLinksRef = useRef(new Set<string>());
   const [isLoading, setIsLoading] = useState(false);
   const [initialUrl, setInitialUrl] = useState('');
 
@@ -41,7 +41,7 @@ function AuthenticatedApp() {
 
   // Form state is now persisted via Zustand, no need for localStorage here
 
-  const handleSubmit = useCallback(async (formData) => {
+  const handleSubmit = useCallback(async (formData: RepackageFormData) => {
     setIsLoading(true);
     
     try {
@@ -51,41 +51,43 @@ function AuthenticatedApp() {
         formData.suffix
       );
       
-      setCurrentTask(task);
+      setCurrentTask({ ...task, status: 'pending', progress: 0 });
       success('Task created successfully!');
-    } catch (err) {
+    } catch (err: any) {
       if (process.env.NODE_ENV !== 'test') {
         console.error('Error creating task:', err);
       }
-      error(
-        err.response?.data?.detail || 'Failed to create task. Please try again.'
-      );
+      error(err.message || 'Failed to create task. Please try again.');
     } finally {
       setIsLoading(false);
     }
   }, [success, error]);
 
-  const handleMarketplaceSubmit = useCallback(async (pluginData) => {
+  const handleMarketplaceSubmit = useCallback(async (pluginData: MarketplaceSelection) => {
     setIsLoading(true);
     
     try {
-      const task = await taskService.createMarketplaceTask(
-        pluginData.author,
-        pluginData.name,
-        pluginData.version,
-        pluginData.platform,
-        pluginData.suffix
-      );
+      const task = pluginData.version
+        ? await taskService.createMarketplaceTask(
+            pluginData.author,
+            pluginData.name,
+            pluginData.version,
+            pluginData.platform,
+            pluginData.suffix
+          )
+        : await taskService.createTask(
+            `https://marketplace.dify.ai/plugins/${pluginData.author}/${pluginData.name}`,
+            pluginData.platform,
+            pluginData.suffix
+          );
       
-      setCurrentTask(task);
+      setCurrentTask({ ...task, status: 'pending', progress: 0 });
       success('Marketplace task created successfully!');
-    } catch (err) {
+    } catch (err: any) {
       if (process.env.NODE_ENV !== 'test') {
         console.error('Error creating marketplace task:', err);
       }
-      error(
-        err.response?.data?.detail || 'Failed to create task. Please try again.'
-      );
+      error(err.message || 'Failed to create task. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +101,7 @@ function AuthenticatedApp() {
       if (!isMounted) return;
       
       const deepLinkKey = deepLinkData && JSON.stringify(deepLinkData);
-      if (deepLinkData && !currentTask && !processedDeepLinksRef.current.has(deepLinkKey)) {
+      if (deepLinkData && deepLinkKey && !currentTask && !processedDeepLinksRef.current.has(deepLinkKey)) {
         // A deep link represents one requested task.  Without marking it as consumed,
         // closing the result panel would submit the same task again on the next render.
         processedDeepLinksRef.current.add(deepLinkKey);
@@ -120,7 +122,9 @@ function AuthenticatedApp() {
           handleMarketplaceSubmit({
             author: deepLinkData.author,
             name: deepLinkData.name,
-            version: deepLinkData.version === 'latest' ? undefined : deepLinkData.version,
+            version: deepLinkData.version === 'latest' || !deepLinkData.version
+              ? undefined
+              : deepLinkData.version,
             platform: '',
             suffix: 'offline'
           });
@@ -134,7 +138,7 @@ function AuthenticatedApp() {
     };
   }, [deepLinkData, currentTask, handleSubmit, handleMarketplaceSubmit]);
 
-  const handleFileSubmit = async (fileData) => {
+  const handleFileSubmit = async (fileData: { file: File; platform: string; suffix: string }) => {
     // Validate fileData
     if (!fileData || !fileData.file) {
       error('No file selected. Please select a .difypkg file to upload.');
@@ -163,14 +167,13 @@ function AuthenticatedApp() {
         fileData.suffix || 'offline'
       );
       
-      setCurrentTask(task);
+      setCurrentTask({ ...task, status: 'pending', progress: 0 });
       success('File upload task created successfully!');
-    } catch (err) {
+    } catch (err: any) {
       if (process.env.NODE_ENV !== 'test') {
         console.error('Error creating file upload task:', err);
       }
-      const errorMessage = err.response?.data?.detail || 
-                          err.message || 
+      const errorMessage = err.message ||
                           'Failed to upload file. Please try again.';
       error(errorMessage);
     } finally {
@@ -178,11 +181,11 @@ function AuthenticatedApp() {
     }
   };
 
-  const handleTaskComplete = (task) => {
+  const handleTaskComplete = (_task: Task) => {
     // Success is handled in TaskStatus component with confetti
   };
 
-  const handleTaskError = (errorMsg) => {
+  const handleTaskError = (errorMsg: string) => {
     error(errorMsg || 'Task failed. Please try again.');
   };
 
@@ -191,15 +194,10 @@ function AuthenticatedApp() {
     useAppStore.getState().setProcessingPanelMinimized(false);
   }, [setCurrentTask]);
 
-  const handleTabChange = (tabId) => {
+  const handleTabChange = (tabId: TabId) => {
     setCurrentTab(tabId);
   };
   
-  // Persist form state changes
-  const updateFormState = (updates) => {
-    setFormState(updates);
-  };
-
   return (
     <>
       <ToastContainer toasts={toasts} onClose={removeToast} />
@@ -209,7 +207,6 @@ function AuthenticatedApp() {
         onTabChange={handleTabChange}
         isProcessing={false}
         onNewTask={handleNewTask}
-        showBackButton={false}
       >
         <div className="space-y-6">
           {/* Sidebar for completed files */}
@@ -239,9 +236,10 @@ function AuthenticatedApp() {
                 onSubmitFile={handleFileSubmit}
                 isLoading={isLoading}
                 currentTab={currentTab}
-                onTabChange={handleTabChange}
-                initialUrl={initialUrl}
-                deepLinkData={deepLinkData}
+                initialUrl={initialUrl || formState.url}
+                initialPlatform={formState.platform}
+                initialSuffix={formState.suffix}
+                onFormStateChange={setFormState}
               />
               
               <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
@@ -298,7 +296,11 @@ function AuthenticatedApp() {
 }
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isCheckingAuth } = useAuth();
+
+  if (isCheckingAuth) {
+    return <div role="status" aria-label="Checking authentication" className="min-h-screen" />;
+  }
 
   return isAuthenticated ? <AuthenticatedApp /> : <LoginForm />;
 }

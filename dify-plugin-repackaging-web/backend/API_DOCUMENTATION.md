@@ -12,17 +12,20 @@ http://localhost:8000/api/v1
 
 ## Authentication
 
-The API supports optional password-based authentication. When the `AUTH_PASSWORD` environment variable is set, all API requests require authentication via the `X-Auth-Password` header.
+The API supports optional password-based authentication. When `AUTH_PASSWORD` is set, clients authenticate once and receive a signed, HttpOnly session cookie. Browser code never stores or resends the raw password.
 
-### Authentication Header
+### Create a session
 
-If authentication is enabled, include the following header in all requests:
+Send the password to the login endpoint:
 
+```http
+POST /api/v1/auth/login
+Content-Type: application/json
+
+{"password":"your-password"}
 ```
-X-Auth-Password: your-password
-```
 
-If authentication is not enabled (AUTH_PASSWORD is empty), this header is not required.
+The response sets the session cookie. Send it on subsequent HTTP and WebSocket requests. Use `GET /api/v1/auth/session` to check the session and `POST /api/v1/auth/logout` to clear it. The legacy `X-Auth-Token` header and HTTP Basic authentication remain accepted for non-browser API clients during migration. If `AUTH_PASSWORD` is empty, authentication is disabled.
 
 ## Rate Limiting
 

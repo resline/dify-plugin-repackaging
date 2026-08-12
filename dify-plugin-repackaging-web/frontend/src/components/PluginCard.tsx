@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Package, User, Tag, ChevronDown, Loader } from 'lucide-react';
-import { marketplaceService } from '../services/api';
+import { marketplaceService } from '../services/marketplace';
+import type { PluginVersion } from '../types/marketplace';
 
 interface Plugin {
   author: string;
@@ -9,11 +10,6 @@ interface Plugin {
   latest_version: string;
   category?: string;
   icon_url?: string;
-}
-
-interface Version {
-  version: string;
-  release_date?: string;
 }
 
 interface PluginCardProps {
@@ -35,7 +31,7 @@ const PluginCard: React.FC<PluginCardProps> = ({
   onClick 
 }) => {
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
-  const [versions, setVersions] = useState<Version[]>([]);
+  const [versions, setVersions] = useState<PluginVersion[]>([]);
   const [selectedVersion, setSelectedVersion] = useState(plugin.latest_version || '');
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
   const [error, setError] = useState('');

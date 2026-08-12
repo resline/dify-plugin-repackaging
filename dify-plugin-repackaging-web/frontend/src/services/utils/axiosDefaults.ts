@@ -1,25 +1,18 @@
 import axios from 'axios';
 
-const AUTH_TOKEN_KEY = 'auth_token';
-
 /**
  * Configure default axios settings for better error handling
  */
 export function configureAxiosDefaults(): void {
   // Set default timeout for all requests
   axios.defaults.timeout = 30000; // 30 seconds
+  axios.defaults.withCredentials = true;
 
-  // Add request interceptor to add timestamps and auth token
+  // Add request timestamps used for slow-request diagnostics.
   axios.interceptors.request.use(
     (config) => {
       // Add timestamp to track request duration
       (config as any)._requestStartTime = Date.now();
-
-      // Add auth token to headers
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
-      if (token && config.headers) {
-        config.headers['X-Auth-Token'] = token;
-      }
 
       return config;
     },
@@ -32,7 +25,7 @@ export function configureAxiosDefaults(): void {
   axios.interceptors.response.use(
     (response) => {
       // Log slow requests in development (but not in tests)
-      if (process.env.NODE_ENV === 'development' && process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV === 'development') {
         const duration = Date.now() - ((response.config as any)._requestStartTime || 0);
         if (duration > 5000) {
           console.warn(`Slow request detected: ${response.config.method?.toUpperCase()} ${response.config.url} took ${duration}ms`);
@@ -46,10 +39,8 @@ export function configureAxiosDefaults(): void {
         return Promise.reject(error);
       }
 
-      // Handle 401 Unauthorized - clear token and trigger re-login
+      // Handle 401 Unauthorized by triggering re-login.
       if (error.response && error.response.status === 401) {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        // Dispatch custom event to notify AuthProvider (no detail to ensure string-only authError)
         window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       }
 

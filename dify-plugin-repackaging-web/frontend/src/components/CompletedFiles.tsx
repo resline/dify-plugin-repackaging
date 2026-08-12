@@ -1,33 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Package, Clock, RefreshCw, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { taskService } from '../services/api';
-
-interface CompletedTask {
-  task_id: string;
-  status: string;
-  created_at: string;
-  completed_at: string;
-  output_filename: string;
-  download_url: string;
-  plugin_metadata?: {
-    name: string;
-    author: string;
-    version: string;
-    description?: string;
-  };
-  marketplace_metadata?: {
-    name: string;
-    author: string;
-    version: string;
-    description?: string;
-  };
-  plugin_info?: {
-    name: string;
-    author: string;
-    version: string;
-    description?: string;
-  };
-}
+import type { CompletedTask } from '../types/app';
 
 interface CompletedFilesProps {
   className?: string;
@@ -87,9 +61,16 @@ const CompletedFiles: React.FC<CompletedFilesProps> = ({ className = '', refresh
       // If the endpoint doesn't exist yet, fall back to listing recent tasks
       try {
         const fallbackResponse = await taskService.listRecentTasks(10);
-        const completedTasks = (fallbackResponse.tasks || []).filter(
-          (task: CompletedTask) => task.status === 'completed' && task.download_url
-        );
+        const completedTasks: CompletedTask[] = (fallbackResponse.tasks || [])
+          .filter((task) => task.status === 'completed' && Boolean(task.download_url))
+          .map((task) => ({
+            ...task,
+            status: 'completed',
+            created_at: task.created_at || new Date().toISOString(),
+            completed_at: task.completed_at || task.created_at || new Date().toISOString(),
+            output_filename: task.output_filename || 'plugin-offline.difypkg',
+            download_url: task.download_url!,
+          }));
         setTasks(completedTasks);
         setError('');
       } catch (fallbackErr) {

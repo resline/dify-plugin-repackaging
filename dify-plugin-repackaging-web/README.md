@@ -26,6 +26,7 @@ A web application that allows users to repackage Dify plugins with offline depen
 
 - Docker and Docker Compose installed
 - Git
+- Node.js 22.12 or newer (Node.js 24 recommended for frontend development)
 
 ### Local Development
 
@@ -42,7 +43,7 @@ cp .env.example .env
 
 3. Start the services:
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 4. Access the application at http://localhost
@@ -52,7 +53,7 @@ docker-compose up --build
 For production deployment, use the production Docker Compose file:
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## 🚀 Deployment on Coolify

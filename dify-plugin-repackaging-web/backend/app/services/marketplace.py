@@ -7,7 +7,6 @@ from app.utils.http_client import get_async_client
 import logging
 import json
 import re
-import asyncio
 from app.utils.circuit_breaker import marketplace_circuit_breaker, CircuitOpenError
 
 logger = logging.getLogger(__name__)
@@ -45,7 +44,7 @@ class MarketplaceService:
                 # Check if it's HTML (common error page)
                 if "text/html" in content_type.lower():
                     logger.error(f"Received HTML response from {url} - likely an error page or API change")
-                    raise ValueError(f"API returned HTML instead of JSON - API may have changed")
+                    raise ValueError("API returned HTML instead of JSON - API may have changed")
                 
                 # Try to parse anyway
                 try:
@@ -407,10 +406,14 @@ class MarketplaceService:
 
                 # Extract and normalize version data
                 # API returns: {code: 0, data: {versions: [...]}} or {versions: [...]}
-                if isinstance(result.get("data"), dict) and "versions" in result["data"]:
+                if isinstance(result, list):
+                    api_versions = result
+                elif isinstance(result, dict) and isinstance(result.get("data"), dict) and "versions" in result["data"]:
                     api_versions = result["data"]["versions"]
-                else:
+                elif isinstance(result, dict):
                     api_versions = result.get("versions", [])
+                else:
+                    api_versions = []
 
                 # Map API fields to expected format
                 mapped_versions = []

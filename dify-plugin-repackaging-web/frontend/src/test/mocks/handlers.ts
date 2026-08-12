@@ -29,16 +29,16 @@ const mockPlugins = [
   }
 ]
 
-const mockFiles = [
+const initialMockFiles = [
   {
-    id: '1',
+    file_id: '1',
     filename: 'agent-0.0.9-offline.difypkg',
     size: 1024000,
     created_at: '2024-01-01T00:00:00Z',
     download_url: '/api/v1/files/1/download'
   },
   {
-    id: '2',
+    file_id: '2',
     filename: 'visualization-0.1.7-offline.difypkg',
     size: 2048000,
     created_at: '2024-01-02T00:00:00Z',
@@ -46,13 +46,33 @@ const mockFiles = [
   }
 ]
 
+const mockFiles = initialMockFiles.map(file => ({ ...file }))
+
+export const resetMockData = () => {
+  mockTasks.clear()
+  mockFiles.splice(0, mockFiles.length, ...initialMockFiles.map(file => ({ ...file })))
+}
+
 export const httpHandlers = [
+  http.get(`${API_BASE_URL}/auth/session`, () => {
+    return HttpResponse.json({ authentication_required: true, authenticated: false })
+  }),
+
+  http.post(`${API_BASE_URL}/auth/login`, () => {
+    return HttpResponse.json({ authenticated: true })
+  }),
+
+  http.post(`${API_BASE_URL}/auth/logout`, () => {
+    return HttpResponse.json({ authenticated: false })
+  }),
+
   // Task endpoints
   http.post(`${API_BASE_URL}/tasks`, async ({ request }) => {
     const body = await request.json() as any
     const taskId = Math.random().toString(36).substring(7)
     const task = {
-      id: taskId,
+      task_id: taskId,
+      progress: 0,
       status: 'pending',
       url: body.url,
       platform: body.platform,
@@ -104,7 +124,8 @@ export const httpHandlers = [
     const body = await request.json() as any
     const taskId = Math.random().toString(36).substring(7)
     const task = {
-      id: taskId,
+      task_id: taskId,
+      progress: 0,
       status: 'pending',
       author: body.author,
       name: body.name,
@@ -126,7 +147,8 @@ export const httpHandlers = [
       const taskId = Math.random().toString(36).substring(7)
       
       const task = {
-        id: taskId,
+        task_id: taskId,
+        progress: 0,
         status: 'pending',
         filename: file ? file.name : 'unknown.difypkg',
         platform: formData.get('platform') as string || '',
@@ -137,11 +159,12 @@ export const httpHandlers = [
       mockTasks.set(taskId, task)
       
       return HttpResponse.json({ task_id: taskId })
-    } catch (error) {
+    } catch (_error) {
       // Handle cases where formData parsing fails
       const taskId = Math.random().toString(36).substring(7)
       const task = {
-        id: taskId,
+        task_id: taskId,
+        progress: 0,
         status: 'pending',
         filename: 'test.difypkg',
         platform: '',
@@ -179,12 +202,12 @@ export const httpHandlers = [
     const completedTasks = Array.from(mockTasks.values())
       .filter(task => task.status === 'completed' && task.result?.download_url)
       .map(task => ({
-        task_id: task.id,
+        task_id: task.task_id,
         status: task.status,
         created_at: task.created_at,
         completed_at: task.completed_at || new Date().toISOString(),
         output_filename: task.result?.filename || 'plugin-offline.difypkg',
-        download_url: task.result?.download_url || `/api/v1/tasks/${task.id}/download`,
+        download_url: task.result?.download_url || `/api/v1/tasks/${task.task_id}/download`,
         plugin_metadata: task.plugin_metadata || {
           name: task.name || 'test-plugin',
           author: task.author || 'test-author',
@@ -272,7 +295,7 @@ export const httpHandlers = [
 
   http.delete(`${API_BASE_URL}/files/:fileId`, ({ params }) => {
     const fileId = params.fileId as string
-    const fileIndex = mockFiles.findIndex(f => f.id === fileId)
+    const fileIndex = mockFiles.findIndex(f => f.file_id === fileId)
     
     if (fileIndex === -1) {
       return HttpResponse.json({ error: 'File not found' }, { status: 404 })
@@ -283,7 +306,7 @@ export const httpHandlers = [
   }),
 
   http.get(`${API_BASE_URL}/files/:fileId/download`, ({ params }) => {
-    const file = mockFiles.find(f => f.id === params.fileId)
+    const file = mockFiles.find(f => f.file_id === params.fileId)
     
     if (!file) {
       return HttpResponse.json({ error: 'File not found' }, { status: 404 })
@@ -425,7 +448,7 @@ export const wsHandlers = [
         if (data.type === 'ping') {
           client.send(JSON.stringify({ type: 'pong' }))
         }
-      } catch (error) {
+      } catch (_error) {
         // Ignore invalid messages
       }
     })

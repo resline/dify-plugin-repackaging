@@ -8,6 +8,7 @@ from app.api import websocket
 from app.api.v1.endpoints import marketplace as v1_marketplace
 from app.api.v1.endpoints import tasks as v1_tasks
 from app.api.v1.endpoints import files as v1_files
+from app.api.v1.endpoints import auth as v1_auth
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -65,6 +66,7 @@ app.include_router(websocket.router)
 app.include_router(v1_marketplace.router, prefix=settings.API_V1_STR)
 app.include_router(v1_tasks.router, prefix=settings.API_V1_STR)
 app.include_router(v1_files.router, prefix=settings.API_V1_STR)
+app.include_router(v1_auth.router, prefix=settings.API_V1_STR)
 
 # Directory creation moved to startup event to avoid permission issues during import
 
@@ -78,6 +80,13 @@ async def startup_event():
         logger.info(f"Created temp directory: {settings.TEMP_DIR}")
     except Exception as e:
         logger.warning(f"Could not create temp directory {settings.TEMP_DIR}: {e}")
+    await websocket.manager.start()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop WebSocket background work and close active transports."""
+    await websocket.manager.stop()
 
 
 @app.middleware("http")

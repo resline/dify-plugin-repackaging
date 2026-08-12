@@ -1,11 +1,21 @@
 import { useEffect, useState } from 'react';
 
+export type DeepLinkData =
+  | { type: 'url'; url: string }
+  | {
+      type: 'marketplace';
+      url?: string;
+      author: string;
+      name: string;
+      version: string | null;
+    };
+
 /**
  * Custom hook to handle deep links from marketplace
  * Extracts plugin information from URL parameters
  */
 export const useDeepLink = () => {
-  const [deepLinkData, setDeepLinkData] = useState(null);
+  const [deepLinkData, setDeepLinkData] = useState<DeepLinkData | null>(null);
 
   useEffect(() => {
     // Parse URL parameters
@@ -24,7 +34,7 @@ export const useDeepLink = () => {
       }
 
       // Check if it's a marketplace URL
-      const marketplaceMatch = url.match(/^https:\/\/marketplace\.dify\.ai\/plugins\/([^\/]+)\/([^\/]+)\/?(?:([^\/]+)\/?)?$/);
+      const marketplaceMatch = url.match(/^https:\/\/marketplace\.dify\.ai\/plugins\/([^/]+)\/([^/]+)\/?(?:([^/]+)\/?)?$/);
       
       if (marketplaceMatch) {
         const [, author, name, version] = marketplaceMatch;

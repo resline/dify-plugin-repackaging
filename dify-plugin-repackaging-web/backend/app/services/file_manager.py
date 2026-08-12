@@ -5,7 +5,7 @@ import os
 import json
 import shutil
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 from app.core.config import settings
 from app.workers.celery_app import redis_client
 import logging
@@ -197,7 +197,7 @@ class FileManager:
 
                 if os.path.isdir(dir_path):
                     # Check directory modification time
-                    mtime = datetime.fromtimestamp(os.path.getmtime(dir_path))
+                    mtime = datetime.fromtimestamp(os.path.getmtime(dir_path), timezone.utc)
                     
                     if mtime < cutoff_time:
                         # Check if this is a completed task
@@ -244,8 +244,6 @@ class FileManager:
             if not task_data:
                 logger.warning(f"Task {task_id} not found in Redis")
                 return False
-            
-            task = json.loads(task_data)
             
             # Build directory path
             task_dir = os.path.join(settings.TEMP_DIR, task_id)
