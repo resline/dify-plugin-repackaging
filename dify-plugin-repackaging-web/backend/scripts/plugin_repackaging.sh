@@ -97,19 +97,37 @@ _local(){
 }
 
 repackage(){
-	local PACKAGE_PATH=$1
-	PACKAGE_NAME_WITH_EXTENSION=`basename ${PACKAGE_PATH}`
-	PACKAGE_NAME="${PACKAGE_NAME_WITH_EXTENSION%.*}"
+	local PACKAGE_PATH="$1"
+	PACKAGE_NAME_WITH_EXTENSION=$(basename "${PACKAGE_PATH}")
+	if [[ "${PACKAGE_NAME_WITH_EXTENSION}" != *.difypkg ]]; then
+		echo "Error: Package filename must end with .difypkg"
+		exit 1
+	fi
+	PACKAGE_NAME="${PACKAGE_NAME_WITH_EXTENSION%.difypkg}"
+	if [[ -z "${PACKAGE_NAME}" || "${PACKAGE_NAME}" == "." || "${PACKAGE_NAME}" == ".." ]]; then
+		echo "Error: Package filename must include a non-dot name before .difypkg"
+		exit 1
+	fi
+	REPACKAGE_WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/dify-plugin-repackaging.XXXXXX")
+	if [[ -z "${REPACKAGE_WORK_DIR}" || ! -d "${REPACKAGE_WORK_DIR}" ]]; then
+		echo "Error: Unable to create temporary repackaging workspace"
+		exit 1
+	fi
+	cleanup_workspace(){
+		rm -rf -- "${REPACKAGE_WORK_DIR}"
+	}
+	trap cleanup_workspace EXIT
+	PACKAGE_DIR="${REPACKAGE_WORK_DIR}/${PACKAGE_NAME}"
 	echo "Unziping ..."
 	install_unzip
-	unzip -o ${PACKAGE_PATH} -d ${CURR_DIR}/${PACKAGE_NAME}
+	unzip -o "${PACKAGE_PATH}" -d "${PACKAGE_DIR}"
 	if [[ $? -ne 0 ]]; then
 		echo "Unzip failed."
 		exit 1
 	fi
 	echo "Unzip success."
 	echo "Repackaging ..."
-	cd ${CURR_DIR}/${PACKAGE_NAME}
+	cd "${PACKAGE_DIR}" || exit 1
 	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
 	if [[ $? -ne 0 ]]; then
 		echo "Pip download failed."
@@ -135,9 +153,9 @@ repackage(){
 			rm -f "${IGNORE_PATH}.bak"
 		fi
 	fi
-	cd ${CURR_DIR}
-	chmod 755 ${CURR_DIR}/${CMD_NAME}
-	if ! ${CURR_DIR}/${CMD_NAME} plugin package ${CURR_DIR}/${PACKAGE_NAME} -o ${CURR_DIR}/${PACKAGE_NAME}-${PACKAGE_SUFFIX}.difypkg; then
+	cd "${CURR_DIR}" || exit 1
+	chmod 755 "${CURR_DIR}/${CMD_NAME}"
+	if ! "${CURR_DIR}/${CMD_NAME}" plugin package "${PACKAGE_DIR}" -o "${CURR_DIR}/${PACKAGE_NAME}-${PACKAGE_SUFFIX}.difypkg"; then
 		echo "Error: Repackaging failed"
 		exit 1
 	fi

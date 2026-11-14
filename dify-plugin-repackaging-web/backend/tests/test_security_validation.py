@@ -8,8 +8,11 @@ This test suite validates that all security fixes for command injection are work
 4. Shell script input validation
 """
 
-import pytest
+from pathlib import Path
+import subprocess
 from unittest.mock import Mock, patch, AsyncMock
+
+import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
 from pydantic import ValidationError
@@ -189,6 +192,7 @@ class TestFilenameValidation:
             ("my_plugin.difypkg", "my_plugin.difypkg"),
             ("plugin123.difypkg", "plugin123.difypkg"),
             ("ABC-xyz_123.difypkg", "ABC-xyz_123.difypkg"),
+            (".hidden-plugin.difypkg", ".hidden-plugin.difypkg"),
         ]
 
         for input_name, expected in valid_files:
@@ -251,6 +255,34 @@ class TestFilenameValidation:
 
         with pytest.raises(ValueError, match="Invalid filename"):
             sanitize_filename("..")
+
+    @pytest.mark.parametrize("filename", [".difypkg", "..difypkg", "...difypkg"])
+    def test_empty_and_dot_segment_package_stems_rejected(self, filename):
+        """Reject names whose post-extension stem is empty or a dot segment."""
+        with pytest.raises(ValueError, match="valid package name"):
+            sanitize_filename(filename)
+
+    @pytest.mark.parametrize("filename", [".difypkg", "..difypkg", "...difypkg"])
+    def test_shell_rejects_dot_segment_package_stems(self, tmp_path, filename):
+        """Reject dangerous stems in the shared shell boundary before extraction."""
+        package_path = tmp_path / filename
+        package_path.write_bytes(b"not reached")
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "scripts"
+            / "plugin_repackaging.sh"
+        )
+
+        result = subprocess.run(
+            ["bash", str(script_path), "local", str(package_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 1
+        assert "non-dot name before .difypkg" in result.stdout
+        assert "Unziping" not in result.stdout
 
     def test_missing_extension_handling(self):
         """Test handling of files without .difypkg extension."""
