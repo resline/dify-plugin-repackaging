@@ -69,6 +69,13 @@ def sanitize_filename(filename: str) -> str:
         else:
             raise ValueError("Filename must end with .difypkg extension")
 
+    # The repackaging script removes the terminal extension before choosing an
+    # extraction directory. Empty and dot-segment stems would resolve outside
+    # the intended per-package directory.
+    package_stem = safe_filename[:-len('.difypkg')]
+    if package_stem in ('', '.', '..'):
+        raise ValueError("Filename must include a valid package name before .difypkg")
+
     return safe_filename
 
 
