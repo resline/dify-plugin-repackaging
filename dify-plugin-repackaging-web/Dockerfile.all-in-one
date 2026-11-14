@@ -45,6 +45,7 @@ RUN mkdir -p /app/scripts && \
     fi && \
     cp /app/backend/scripts/$BINARY_NAME /app/scripts/dify-plugin-linux-amd64-5g && \
     cp /app/backend/scripts/plugin_repackaging.sh /app/scripts/plugin_repackaging.sh && \
+    cp /app/backend/scripts/validate_requirements.py /app/scripts/validate_requirements.py && \
     chmod +x /app/scripts/dify-plugin-linux-amd64-5g /app/scripts/plugin_repackaging.sh
 
 # Create Redis config for persistence
