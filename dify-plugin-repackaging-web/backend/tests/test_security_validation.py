@@ -223,8 +223,11 @@ class TestFilenameValidation:
 
     def test_special_characters_sanitization(self):
         """Test that special characters are removed/replaced."""
+        # basename is .difypkg, so the tightened package-stem guard rejects it.
+        with pytest.raises(ValueError, match="valid package name"):
+            sanitize_filename("plugin;rm -rf /.difypkg")
+
         special_char_files = [
-            ("plugin;rm -rf /.difypkg", "plugin_rm_-rf__.difypkg"),
             ("$(whoami).difypkg", "__whoami_.difypkg"),
             ("|cat /etc/passwd.difypkg", "_cat__etc_passwd.difypkg"),
             ("&&curl evil.com.difypkg", "__curl_evil.com.difypkg"),
