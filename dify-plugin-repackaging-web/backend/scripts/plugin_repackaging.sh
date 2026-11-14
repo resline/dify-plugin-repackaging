@@ -22,7 +22,7 @@ if [[ "arm64" == "$ARCH_NAME" || "aarch64" == "$ARCH_NAME" ]]; then
 	CMD_NAME="dify-plugin-${OS_TYPE}-arm64-5g"
 fi
 
-PIP_PLATFORM=""
+PIP_PLATFORM=()
 PACKAGE_SUFFIX="offline"
 
 market(){
@@ -82,7 +82,7 @@ github(){
 }
 
 _local(){
-	echo $2
+	echo "$2"
 	if [[ -z "$2" ]]; then
 		echo ""
 		echo "Usage: "$0" local [difypkg path]"
@@ -92,12 +92,14 @@ _local(){
 		echo ""
 		exit 1
 	fi
-	PLUGIN_PACKAGE_PATH=`realpath $2`
-	repackage ${PLUGIN_PACKAGE_PATH}
+	PLUGIN_PACKAGE_PATH=$(realpath "$2")
+	repackage "${PLUGIN_PACKAGE_PATH}"
 }
 
 repackage(){
 	local PACKAGE_PATH="$1"
+	local PACKAGE_NAME_WITH_EXTENSION
+	local PACKAGE_NAME
 	PACKAGE_NAME_WITH_EXTENSION=$(basename "${PACKAGE_PATH}")
 	if [[ "${PACKAGE_NAME_WITH_EXTENSION}" != *.difypkg ]]; then
 		echo "Error: Package filename must end with .difypkg"
@@ -128,8 +130,20 @@ repackage(){
 	echo "Unzip success."
 	echo "Repackaging ..."
 	cd "${PACKAGE_DIR}" || exit 1
-	pip download ${PIP_PLATFORM} -r requirements.txt -d ./wheels --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
-	if [[ $? -ne 0 ]]; then
+	local VALIDATED_REQUIREMENTS PIP_DOWNLOAD_STATUS
+	if ! VALIDATED_REQUIREMENTS=$(mktemp); then
+		echo "Unable to create a temporary requirements file."
+		exit 1
+	fi
+	if ! python3 -I "${CURR_DIR}/validate_requirements.py" requirements.txt > "${VALIDATED_REQUIREMENTS}"; then
+		rm -f "${VALIDATED_REQUIREMENTS}"
+		echo "Requirements validation failed."
+		exit 1
+	fi
+	pip download "${PIP_PLATFORM[@]}" --only-binary=:all: -r "${VALIDATED_REQUIREMENTS}" -d ./wheels --index-url "${PIP_MIRROR_URL}" --trusted-host mirrors.aliyun.com
+	PIP_DOWNLOAD_STATUS=$?
+	rm -f "${VALIDATED_REQUIREMENTS}"
+	if [[ ${PIP_DOWNLOAD_STATUS} -ne 0 ]]; then
 		echo "Pip download failed."
 		exit 1
 	fi
@@ -189,7 +203,7 @@ print_usage() {
 
 while getopts "p:s:" opt; do
 	case "$opt" in
-		p) PIP_PLATFORM="--platform ${OPTARG} --only-binary=:all:" ;;
+		p) PIP_PLATFORM=(--platform "${OPTARG}") ;;
 		s) PACKAGE_SUFFIX="${OPTARG}" ;;
 		*) print_usage; exit 1 ;;
 	esac
@@ -206,7 +220,7 @@ case "$1" in
 	github $@
 	;;
 	'local')
-	_local $@
+	_local "$@"
 	;;
 	*)
 
